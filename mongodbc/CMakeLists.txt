@@ -5,9 +5,8 @@
 #find_package (mongoc-1.0 REQUIRED)
 
 include_directories(inc)
-include_directories(/usr/include/mongo)
-include_directories(/usr/include/libbson-1.0)
-include_directories(/usr/include/libmongoc-1.0)
+include_directories(/usr/local/include/mongocxx/v_noabi)
+include_directories(/usr/local/include/bsoncxx/v_noabi)
 
 link_directories(/usr/lib/x86_64-linux-gnu)
 
@@ -18,8 +17,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -Wall -Wextra")
 file(GLOB SOURCES "src/*.cc")
 
 add_library(mongodbc STATIC ${SOURCES})
-#target_link_libraries(mongo_client mongoc-1.0 bson-1.0)
-#target_link_libraries (mongodbc libbson-1.0.so)
-#target_link_libraries (mongodbc libmongoc-1.0.so)
-#target_link_libraries (dbc-service PRIVATE mongo::mongoc_shared)
+
+target_link_libraries(mongodbc bsoncxx)
+target_link_libraries(mongodbc mongocxx)
 

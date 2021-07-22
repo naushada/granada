@@ -3,6 +3,11 @@ project(microservice)
 
 add_subdirectory(mongodbc)
 
+include_directories(/usr/local/include/mongocxx/v_noabi)
+include_directories(/usr/local/include/bsoncxx/v_noabi)
+include_directories(mongodbc/inc)
+
+
 include_directories(inc)
 include_directories(/usr/local/ACE_TAO-7.0.0/include)
 link_directories(/usr/local/ACE_TAO-7.0.0/lib)
@@ -16,4 +21,4 @@ file(GLOB SOURCES "src/*.cc")
 add_executable(uniservice ${SOURCES})
 target_link_libraries(uniservice pthread)
 target_link_libraries(uniservice ACE)
-#target_link_libraries(uniservice mongodbc)
+target_link_libraries(uniservice mongodbc)

@@ -19,6 +19,9 @@
 #include "ace/OS_Memory.h"
 #include "ace/Thread_Manager.h"
 
+#include "mongodbc.h"
+
+
 /* Forward declaration */
 class WebServer;
 
@@ -95,7 +98,10 @@ class WebConnection : public ACE_Event_Handler {
         void connAddr(ACE_INET_Addr addr) {
           m_connAddr = addr;
         }
-        
+
+        WebServer* parent() {
+            return(m_parent);
+        } 
 
     private:
         long m_timerId;
@@ -139,6 +145,9 @@ class WebServer : public ACE_Event_Handler {
             return(curr);
         }
 
+        Mongodbc* mongodbcInst() {
+            return(mMongodbc);
+        }
     private:
         ACE_Message_Block m_mb;
         ACE_SOCK_Stream m_stream;
@@ -148,6 +157,8 @@ class WebServer : public ACE_Event_Handler {
         std::unordered_map<ACE_HANDLE, WebConnection*> m_connectionPool;
         std::vector<MicroService*> m_workerPool;
         std::vector<MicroService*>::iterator m_currentWorker;
+        /* mongo db interface */
+        Mongodbc* mMongodbc;
 
 };
 

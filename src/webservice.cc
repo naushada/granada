@@ -59,12 +59,17 @@ int MicroService::svc()
                 /* code */
                 ACE_HANDLE handle = *((ACE_HANDLE *)m_mb->rd_ptr());
                 m_mb->rd_ptr(sizeof(ACE_HANDLE));
+                std::uintptr_t inst = *((std::uintptr_t *)m_mb->rd_ptr());
+                Mongodbc* dbInst = reinterpret_cast<Mongodbc *>(inst);
+                m_mb->rd_ptr(sizeof(uintptr_t));
 
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d\n"), handle, m_mb->length()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s \n"), dbInst->get_uri().c_str()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, m_mb->length()));
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq %s\n"), m_mb->rd_ptr()));
                 /*! Process The Request */
                 process_request(handle, *m_mb);
+                m_mb->release();
                 break;
             }
             case ACE_Message_Block::MB_PCSIG:
@@ -204,11 +209,19 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort)
     }
 
     m_currentWorker = std::begin(m_workerPool);
+
+    /* Mongo DB interface */
+    std::string uri("mongodb://127.0.0.1:27017");
+    std::string dbName("bayt");
+    mMongodbc = new Mongodbc(uri, dbName);
 }
 
 WebServer::~WebServer()
 {
+    if(nullptr != mMongodbc) {
+        delete mMongodbc;
 
+    }
 }
 
 bool WebServer::start()
@@ -276,8 +289,19 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 
     ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1KB));
     req->msg_type(ACE_Message_Block::MB_DATA);
+    /*_ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+     | 4-bytes handle   | 4-bytes db instance pointer   | request (payload) |
+     |_ _ _ _ _ _ _ _ _ |_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _|_ _ _ _ _ _ _ _ _ _|
+     */
     *((ACE_HANDLE *)req->wr_ptr()) = handle;
     req->wr_ptr(sizeof(ACE_HANDLE));
+
+    /* db instance */
+    std::uintptr_t inst = reinterpret_cast<std::uintptr_t>(parent()->mongodbcInst());
+    *((std::uintptr_t* )req->wr_ptr()) = inst;
+
+    //std::memcpy((void *)req->wr_ptr(), (void *)parent(), sizeof(uintptr_t));
+    req->wr_ptr(sizeof(uintptr_t));
 
     std::int32_t len = recv(handle, req->wr_ptr(), (size_t)MemorySize::SIZE_1KB, 0);
     if(len < 0) {
@@ -297,7 +321,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     mEnt->putq(req);
 
     /* re-claim the memory now. */
-    req->release();
+    //req->release();
     return(0);
 }
 

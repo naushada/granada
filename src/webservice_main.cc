@@ -1,7 +1,7 @@
 #ifndef __webservice_main_cc__
 #define __webservice_main_cc__
 
-#include <webservice.h>
+#include "webservice.h"
 
 int main()
 {
