@@ -56,17 +56,24 @@ int MicroService::svc()
             {
             case ACE_Message_Block::MB_DATA:
             {
-                /* code */
+                /*_ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                 | 4-bytes handle   | 4-bytes db instance pointer   | request (payload) |
+                 |_ _ _ _ _ _ _ _ _ |_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _|_ _ _ _ _ _ _ _ _ _|
+                */
                 ACE_HANDLE handle = *((ACE_HANDLE *)m_mb->rd_ptr());
                 m_mb->rd_ptr(sizeof(ACE_HANDLE));
+
                 std::uintptr_t inst = *((std::uintptr_t *)m_mb->rd_ptr());
                 Mongodbc* dbInst = reinterpret_cast<Mongodbc *>(inst);
                 m_mb->rd_ptr(sizeof(uintptr_t));
+                /* Testing */
+                std::string doc = "{\"name\":\"Naushad\", \"age\": 43, \"Address\":\"Pune\"}";
+                dbInst->create_shipment(doc);
 
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s \n"), dbInst->get_uri().c_str()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s dbName %s\n"), dbInst->get_uri().c_str(), dbInst->get_dbName().c_str()));
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, m_mb->length()));
 
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq %s\n"), m_mb->rd_ptr()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq\n %s"), m_mb->rd_ptr()));
                 /*! Process The Request */
                 process_request(handle, *m_mb);
                 m_mb->release();

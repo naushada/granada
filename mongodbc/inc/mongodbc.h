@@ -7,21 +7,15 @@
 #include <mutex>
 
 #include <bsoncxx/json.hpp>
+#include <mongocxx/pool.hpp>
 #include <mongocxx/client.hpp>
 #include <mongocxx/stdx.hpp>
 #include <mongocxx/uri.hpp>
 #include <mongocxx/instance.hpp>
+#include <mongocxx/cursor.hpp>
 #include <bsoncxx/builder/stream/helpers.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/builder/stream/array.hpp>
-
-
-using bsoncxx::builder::stream::close_array;
-using bsoncxx::builder::stream::close_document;
-using bsoncxx::builder::stream::document;
-using bsoncxx::builder::stream::finalize;
-using bsoncxx::builder::stream::open_array;
-using bsoncxx::builder::stream::open_document;
 
 enum class CollectionName : std::uint32_t {
     SHIPPING = 0,
@@ -38,7 +32,7 @@ enum class CollectionName : std::uint32_t {
 
 class Mongodbc {
     public:
-        Mongodbc(std::string uri, std::string db_name);
+        Mongodbc(std::string uri, std::string db_name, std::uint32_t poolSize = 50u);
         Mongodbc();
         ~Mongodbc();
 
@@ -67,9 +61,10 @@ class Mongodbc {
         }
 
         bool create_shipment(std::string shippingRecord);
-        bool update_shipment(std::string shippingRecord);
+        bool update_shipment(std::string match, std::string shippingRecord);
         bool delete_shipment(std::string shippingRecord);
-        void dump_document(bsoncxx::document::value& doc, CollectionName collection);
+        std::string get_shipment(std::string key);
+        void dump_document(CollectionName collection);
 
     private:
         std::string mURI;
@@ -78,6 +73,8 @@ class Mongodbc {
         mongocxx::database mMongoDbInst;
         std::array<mongocxx::collection, 64> mMongoCollections;
         mongocxx::client* mMongoConn;
+        /* Pool of db connections */
+        mongocxx::pool* mMongoConnPool;
         mongocxx::instance* mInstance;
         mongocxx::uri mMongoUri;
         std::mutex mMutex;
