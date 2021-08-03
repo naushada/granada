@@ -42,6 +42,7 @@ enum class MemorySize : std::uint32_t {
 
 class MicroService : public ACE_Task<ACE_MT_SYNCH> {
     public:
+
         int svc(void) override;
 				int open(void *args=0) override;
         int close (u_long flags=0) override;
@@ -50,7 +51,6 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
 
         MicroService(ACE_Thread_Manager *thrMgr);
 				~MicroService();
-        ACE_INT32 process_request(ACE_HANDLE handle, ACE_Message_Block& mb);
 
         ACE_thread_t myThreadId() {
           return(m_threadId);
@@ -60,6 +60,13 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
           ACE_Thread_Manager::instance()->thr_state(m_threadId, st);
           return(ACE_Thread_Manager::ACE_THR_RUNNING == st);
         }
+
+        ACE_INT32 process_request(ACE_HANDLE handle, ACE_Message_Block& mb);
+        ACE_Message_Block* handle_OPTIONS(ACE_Message_Block& in);
+        ACE_Message_Block* handle_GET(ACE_Message_Block& in);
+        ACE_Message_Block* handle_POST(ACE_Message_Block& in);
+        ACE_Message_Block* handle_PUT(ACE_Message_Block& in);
+        ACE_Message_Block* handle_DELETE(ACE_Message_Block& in);
 
     private:
         bool m_continue;
