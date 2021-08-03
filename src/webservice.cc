@@ -7,10 +7,10 @@ ACE_Message_Block* MicroService::handle_OPTIONS(ACE_Message_Block& in)
 {
     std::string http_header;
     http_header = "HTTP/1.1 200 OK\r\n";
-    http_header += "Access-Control-Allow-Origin: *\r\n";
-    http_header += "Access-Control-Allow-Method: GET, POST, OPTIONS\r\n";
-    http_header += "Access-Control-Allowed-Headers: DNT, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Range\r\n";
+    http_header += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
+    http_header += "Access-Control-Allow-Headers: DNT, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Range\r\n";
     http_header += "Access-Control-Max-Age: 1728000\r\n";
+    http_header += "Access-Control-Allow-Origin: *\r\n";
     http_header += "Content-Type: text/plain; charset=utf-8\r\n";
     http_header += "Content-Length: 0\r\n";
     http_header += "\r\n\r\n";
@@ -355,7 +355,7 @@ bool WebServer::stop()
 long WebServer::start_conn_cleanup_timer(ACE_HANDLE handle)
 {
     long timerId = -1;
-    ACE_Time_Value to(5,0);
+    ACE_Time_Value to(100,0);
     timerId = ACE_Reactor::instance()->schedule_timer(this, (const void *)handle, to);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l webserver cleanup timer is started for handle %d\n"), handle));
     return(timerId);
