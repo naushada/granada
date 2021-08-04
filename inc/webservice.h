@@ -44,13 +44,13 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
     public:
 
         int svc(void) override;
-				int open(void *args=0) override;
+        int open(void *args=0) override;
         int close (u_long flags=0) override;
 
         ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
 
         MicroService(ACE_Thread_Manager *thrMgr);
-				~MicroService();
+        ~MicroService();
 
         ACE_thread_t myThreadId() {
           return(m_threadId);
@@ -81,7 +81,7 @@ class WebConnection : public ACE_Event_Handler {
         ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
         ACE_INT32 handle_input(ACE_HANDLE handle) override;
         ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
-				ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
+        ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
         ACE_HANDLE get_handle() const override;
 
         WebConnection(WebServer* parent);
@@ -102,6 +102,7 @@ class WebConnection : public ACE_Event_Handler {
         void handle(ACE_HANDLE fd) {
             m_handle = fd;
         }
+
         void connAddr(ACE_INET_Addr addr) {
           m_connAddr = addr;
         }
@@ -122,11 +123,11 @@ class WebServer : public ACE_Event_Handler {
         ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
         ACE_INT32 handle_input(ACE_HANDLE handle) override;
         ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
-				ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
+        ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
         ACE_HANDLE get_handle() const override;
 
-				WebServer(std::string _ip, ACE_UINT16 _port);
-				~WebServer();
+        WebServer(std::string _ip, ACE_UINT16 _port);
+        ~WebServer();
         bool start();
         bool stop();
 
@@ -159,8 +160,8 @@ class WebServer : public ACE_Event_Handler {
     private:
         ACE_Message_Block m_mb;
         ACE_SOCK_Stream m_stream;
-				ACE_INET_Addr m_listen;
-				ACE_SOCK_Acceptor m_server;
+        ACE_INET_Addr m_listen;
+        ACE_SOCK_Acceptor m_server;
         bool m_stopMe;
         std::unordered_map<ACE_HANDLE, WebConnection*> m_connectionPool;
         std::vector<MicroService*> m_workerPool;

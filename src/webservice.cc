@@ -151,6 +151,7 @@ int MicroService::close(u_long flag)
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is closing\n")));
 }
+
 int MicroService::svc() 
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is spawned\n")));
@@ -306,7 +307,6 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort)
 
     int reuse_addr = 1;
     if(m_server.open(m_listen, reuse_addr)) {
-
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l Starting of WebServer failed - opening of port %d hostname %s\n"), m_listen.get_port_number(), m_listen.get_host_name()));
     }
 
@@ -453,7 +453,6 @@ ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 
 ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
 {
-
     if(m_timerId > 0) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l Running timer for handle %d is stopped\n"), handle));
         m_parent->stop_conn_cleanup_timer(m_timerId);
