@@ -25,7 +25,7 @@ ACE_Message_Block* MicroService::handle_OPTIONS(ACE_Message_Block& in)
     return(rsp);
 }
 
-ACE_Message_Block* MicroService::handle_GET(ACE_Message_Block& in)
+ACE_Message_Block* MicroService::handle_GET(ACE_Message_Block& in, Mongodbc& dbInst)
 {
     std::string http_header, http_body;
     ACE_Message_Block* rsp = nullptr;
@@ -46,7 +46,7 @@ ACE_Message_Block* MicroService::handle_GET(ACE_Message_Block& in)
     return(rsp);
 }
 
-ACE_Message_Block* MicroService::handle_POST(ACE_Message_Block& in)
+ACE_Message_Block* MicroService::handle_POST(ACE_Message_Block& in, Mongodbc& dbInst)
 {
     std::string http_header;
     ACE_Message_Block* rsp = nullptr;
@@ -64,7 +64,7 @@ ACE_Message_Block* MicroService::handle_POST(ACE_Message_Block& in)
     return(rsp);
 }
 
-ACE_Message_Block* MicroService::handle_PUT(ACE_Message_Block& in)
+ACE_Message_Block* MicroService::handle_PUT(ACE_Message_Block& in, Mongodbc& dbInst)
 {
     std::string http_header, http_body;
     ACE_Message_Block* rsp = nullptr;
@@ -80,7 +80,7 @@ ACE_Message_Block* MicroService::handle_PUT(ACE_Message_Block& in)
 
 }
 
-ACE_Message_Block* MicroService::handle_DELETE(ACE_Message_Block& in)
+ACE_Message_Block* MicroService::handle_DELETE(ACE_Message_Block& in, Mongodbc& dbInst)
 {
     std::string http_header, http_body;
     ACE_Message_Block* rsp = nullptr;
@@ -97,7 +97,7 @@ ACE_Message_Block* MicroService::handle_DELETE(ACE_Message_Block& in)
 }
 
 
-ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb)
+ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb, Mongodbc& dbInst)
 {
     std::string http_header, http_body;
     http_header.clear();
@@ -109,13 +109,13 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     if(std::string::npos != req.find("OPTIONS", 0)) {
       rsp = handle_OPTIONS(mb);
     } else if(std::string::npos != req.find("GET", 0)) {
-      rsp = handle_GET(mb); 
+      rsp = handle_GET(mb, dbInst); 
     } else if(std::string::npos != req.find("POST", 0)) {
-      rsp = handle_POST(mb);
+      rsp = handle_POST(mb, dbInst);
     } else if(std::string::npos != req.find("PUT", 0)) {
-      rsp = handle_PUT(mb);
+      rsp = handle_PUT(mb, dbInst);
     } else if(std::string::npos != req.find("DELETE", 0)) {
-      rsp = handle_DELETE(mb);  
+      rsp = handle_DELETE(mb, dbInst);  
     } else {
       /* Not supported Method */
     }
@@ -169,7 +169,7 @@ int MicroService::svc()
                 m_mb->rd_ptr(sizeof(ACE_HANDLE));
 
                 std::uintptr_t inst = *((std::uintptr_t *)m_mb->rd_ptr());
-                Mongodbc* dbInst = reinterpret_cast<Mongodbc *>(inst);
+                Mongodbc* dbInst = reinterpret_cast<Mongodbc*>(inst);
                 m_mb->rd_ptr(sizeof(uintptr_t));
                 /* Testing */
                 std::string doc = "{\"name\":\"Naushad\", \"age\": 43, \"Address\":\"Pune\"}";
@@ -180,7 +180,7 @@ int MicroService::svc()
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq\n %s"), m_mb->rd_ptr()));
                 /*! Process The Request */
-                process_request(handle, *m_mb);
+                process_request(handle, *m_mb, *dbInst);
                 m_mb->release();
                 break;
             }

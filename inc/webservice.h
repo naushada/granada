@@ -61,12 +61,12 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
           return(ACE_Thread_Manager::ACE_THR_RUNNING == st);
         }
 
-        ACE_INT32 process_request(ACE_HANDLE handle, ACE_Message_Block& mb);
+        ACE_INT32 process_request(ACE_HANDLE handle, ACE_Message_Block& mb, Mongodbc& dbInst);
         ACE_Message_Block* handle_OPTIONS(ACE_Message_Block& in);
-        ACE_Message_Block* handle_GET(ACE_Message_Block& in);
-        ACE_Message_Block* handle_POST(ACE_Message_Block& in);
-        ACE_Message_Block* handle_PUT(ACE_Message_Block& in);
-        ACE_Message_Block* handle_DELETE(ACE_Message_Block& in);
+        ACE_Message_Block* handle_GET(ACE_Message_Block& in, Mongodbc& dbInst);
+        ACE_Message_Block* handle_POST(ACE_Message_Block& in, Mongodbc& dbInst);
+        ACE_Message_Block* handle_PUT(ACE_Message_Block& in, Mongodbc& dbInst);
+        ACE_Message_Block* handle_DELETE(ACE_Message_Block& in, Mongodbc& dbInst);
 
     private:
         bool m_continue;
