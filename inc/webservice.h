@@ -132,6 +132,7 @@ class WebServer : public ACE_Event_Handler {
 
         long start_conn_cleanup_timer(ACE_HANDLE handle);
         void stop_conn_cleanup_timer(long timerId);
+        void restart_conn_cleanup_timer(ACE_HANDLE handle);
 
         std::unordered_map<ACE_HANDLE, WebConnection*>& connectionPool() {
           return(m_connectionPool);

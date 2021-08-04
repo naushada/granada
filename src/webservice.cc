@@ -53,6 +53,7 @@ ACE_Message_Block* MicroService::handle_POST(ACE_Message_Block& in)
 
     http_header = "HTTP/1.1 200 OK\r\n";
     http_header += "Connection: keep-alive\r\n";
+    http_header += "Content-Length: 0\r\n";
 
     ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
 
@@ -229,9 +230,9 @@ ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
 
     if(conIt != std::end(m_connectionPool)) {
         WebConnection* connEnt = conIt->second;
-        conIt = m_connectionPool.erase(conIt);
-        close(connEnt->handle());
-
+        /* let the reactor call handle_close on this handle */
+        ACE_Reactor::instance()->remove_handler(handle, ACE_Event_Handler::READ_MASK);
+        /* reclaim the heap memory */
         delete connEnt;
     }
 
@@ -355,7 +356,7 @@ bool WebServer::stop()
 long WebServer::start_conn_cleanup_timer(ACE_HANDLE handle)
 {
     long timerId = -1;
-    ACE_Time_Value to(100,0);
+    ACE_Time_Value to(5,0);
     timerId = ACE_Reactor::instance()->schedule_timer(this, (const void *)handle, to);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l webserver cleanup timer is started for handle %d\n"), handle));
     return(timerId);
@@ -365,6 +366,18 @@ void WebServer::stop_conn_cleanup_timer(long timerId)
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l webserver connection cleanup timer is stopped\n")));
     ACE_Reactor::instance()->cancel_timer(timerId);
+}
+void WebServer::restart_conn_cleanup_timer(ACE_HANDLE handle)
+{
+    ACE_Time_Value to(5,0);
+    auto conIt = connectionPool().find(handle);
+
+    if(conIt != std::end(connectionPool())) {
+        auto connEnt = conIt->second;
+        long tId = connEnt->timerId();
+        ACE_Reactor::instance()->reset_timer_interval(tId, to);
+    }
+
 }
 
 WebConnection::WebConnection(WebServer* parent)
@@ -450,6 +463,7 @@ ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
     if(it != std::end(m_parent->connectionPool())) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l Entry is removed from connection pool\n")));
         it = m_parent->connectionPool().erase(it);
+        close(handle);
     }
 
     return(0);
