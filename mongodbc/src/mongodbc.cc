@@ -113,6 +113,20 @@ bool Mongodbc::create_shipment(std::string shipmentRecord)
 
 bool Mongodbc::update_shipment(std::string match, std::string shippingRecord)
 {
+    bsoncxx::document::value toUpdate = bsoncxx::from_json(shippingRecord.c_str());
+    bsoncxx::document::value filter = bsoncxx::from_json(match.c_str());
+
+    if(nullptr != mMongoConn) {
+        mMutex.lock();
+        //bsoncxx::stdx::optional<mongocxx::result::insert_one> result = get_collection(CollectionName::SHIPPING).insert_one(new_shipment.view());
+        mMutex.unlock();
+    } else {
+        auto conn = mMongoConnPool->acquire();
+        mongocxx::database dbInst = conn->database(get_dbName().c_str());
+        auto collection = dbInst.collection("shipping");
+        //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
+        bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), {$set:toUpdate.view()});
+    }
     #if 0
     bsoncxx::document::value new_shipment = bsoncxx::from_json(shippingRecord.c_str());
     bsoncxx::document::value match = bsoncxx::from_json(match.c_str());
@@ -128,9 +142,15 @@ bool Mongodbc::delete_shipment(std::string shippingRecord)
 {
     return(true);
 }
-std::string Mongodbc::get_shipment(std::string key)
+std::string Mongodbc::get_shipment(std::string criteria)
 {
     std::string json_object;
+    bsoncxx::document::value filter = bsoncxx::from_json(criteria.c_str());
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection("shipping");
+    //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
+    bsoncxx::stdx::optional<mongocxx::cursor> result = collection.find(filter.view());
     #if 0
     bsoncxx::document::value what = bsoncxx::from_json(key.c_str());
     json_object.clear();
