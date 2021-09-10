@@ -132,6 +132,56 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     return(ret);
 }
 
+
+ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
+{
+    size_t ct_offset = 0, cl_offset = 0;
+    /* Get the payload length */
+    if(std::string::npos != (ct_offset = in.find("Content-Type: ", 0)) && std::string::npos != (cl_offset = in.find("Content-Length: ", 0))) {
+        /* Both content Type & content Length are present */
+        size_t ct_offset_v = 0, cl_offset_v = 0;
+        ct_offset_v = in.find("\r\n", ct_offset);
+        cl_offset_v = in.find("\r\n", cl_offset);
+        std::string ct_match("Content-Type: ");
+        ct_offset += ct_match.length();
+        std::string cl_match("Content-Length: ");
+        cl_offset += cl_match.length();
+
+        std::string ct_value = in.substr(ct_offset, (ct_offset_v - ct_offset));
+        std::string cl_value = in.substr(cl_offset, (cl_offset_v - cl_offset));
+
+        if(!ct_value.compare("application/json")) {
+            std::string body_delimeter("\r\n\r\n");
+            size_t body_offset = in.find(body_delimeter, 0);
+            if(std::string::npos != body_offset) {
+                body_offset += body_delimeter.length();
+                std::string document = in.substr(body_offset);
+
+                /* write this document into data base now.*/
+                dbInst.create_shipment(document);
+            }
+        }
+    }
+    return(build_responseOK());
+}
+
+ACE_Message_Block* MicroService::build_responseOK()
+{
+    std::string http_header;
+    ACE_Message_Block* rsp = nullptr;
+
+    http_header = "HTTP/1.1 200 OK\r\n";
+    http_header += "Connection: keep-alive\r\n";
+    http_header += "Content-Length: 0\r\n";
+
+    ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
+
+    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
+    rsp->wr_ptr(http_header.length());
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
+    return(rsp);
+}
 ACE_INT32 MicroService::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 {
 
@@ -171,9 +221,6 @@ int MicroService::svc()
                 std::uintptr_t inst = *((std::uintptr_t *)m_mb->rd_ptr());
                 Mongodbc* dbInst = reinterpret_cast<Mongodbc*>(inst);
                 m_mb->rd_ptr(sizeof(uintptr_t));
-                /* Testing */
-                std::string doc = "{\"name\":\"Naushad\", \"age\": 43, \"Address\":\"Pune\"}";
-                dbInst->create_shipment(doc);
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s dbName %s\n"), dbInst->get_uri().c_str(), dbInst->get_dbName().c_str()));
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, m_mb->length()));
