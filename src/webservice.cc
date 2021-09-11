@@ -107,13 +107,15 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     std::string req(mb.rd_ptr(), mb.length());
 
     if(std::string::npos != req.find("OPTIONS", 0)) {
-      rsp = handle_OPTIONS(mb);
+      //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l HTTP Method is OPTIONS\n")));
+      rsp = handle_OPTIONS(req);
+      //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response\n%s"), rsp->length(), rsp->rd_ptr()));
     } else if(std::string::npos != req.find("GET", 0)) {
       rsp = handle_GET(mb, dbInst); 
     } else if(std::string::npos != req.find("POST", 0)) {
       rsp = handle_POST(mb, dbInst);
     } else if(std::string::npos != req.find("PUT", 0)) {
-      rsp = handle_PUT(mb, dbInst);
+      rsp = handle_PUT(req, dbInst);
     } else if(std::string::npos != req.find("DELETE", 0)) {
       rsp = handle_DELETE(mb, dbInst);  
     } else {
@@ -151,18 +153,42 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
         std::string cl_value = in.substr(cl_offset, (cl_offset_v - cl_offset));
 
         if(!ct_value.compare("application/json")) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
             std::string body_delimeter("\r\n\r\n");
             size_t body_offset = in.find(body_delimeter, 0);
             if(std::string::npos != body_offset) {
                 body_offset += body_delimeter.length();
                 std::string document = in.substr(body_offset);
 
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Document is writen in databse\n")));
                 /* write this document into data base now.*/
                 dbInst.create_shipment(document);
             }
         }
     }
     return(build_responseOK());
+}
+
+ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
+{
+    std::string http_header;
+    http_header = "HTTP/1.1 200 OK\r\n";
+    http_header += "Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE\r\n";
+    http_header += "Access-Control-Allow-Headers: DNT, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Range\r\n";
+    http_header += "Access-Control-Max-Age: 1728000\r\n";
+    http_header += "Access-Control-Allow-Origin: *\r\n";
+    http_header += "Content-Type: text/plain; charset=utf-8\r\n";
+    http_header += "Content-Length: 0\r\n";
+    http_header += "\r\n\r\n";
+    ACE_Message_Block* rsp = nullptr;
+
+    ACE_NEW_RETURN(rsp, ACE_Message_Block(512), nullptr);
+
+    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
+    rsp->wr_ptr(http_header.length());
+
+    //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
+    return(rsp);
 }
 
 ACE_Message_Block* MicroService::build_responseOK()
@@ -457,7 +483,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     ACE_Message_Block* req;
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l WebConnection::handle_input\n")));
 
-    ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1KB));
+    ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_10KB));
     req->msg_type(ACE_Message_Block::MB_DATA);
     /*_ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
      | 4-bytes handle   | 4-bytes db instance pointer   | request (payload) |
@@ -472,7 +498,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 
     req->wr_ptr(sizeof(uintptr_t));
 
-    std::int32_t len = recv(handle, req->wr_ptr(), (size_t)MemorySize::SIZE_1KB, 0);
+    std::int32_t len = recv(handle, req->wr_ptr(), (size_t)MemorySize::SIZE_10KB, 0);
     if(len < 0) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D %M %t:%N:%l Receive failed for handle %d\n"), handle));
         return(len);
