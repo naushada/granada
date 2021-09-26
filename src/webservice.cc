@@ -2,6 +2,7 @@
 #define __webservice_cc__
 
 #include "webservice.h"
+#include "http_parser.h"
 
 ACE_Message_Block* MicroService::handle_OPTIONS(ACE_Message_Block& in)
 {
@@ -96,7 +97,6 @@ ACE_Message_Block* MicroService::handle_DELETE(ACE_Message_Block& in, Mongodbc& 
 
 }
 
-
 ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb, Mongodbc& dbInst)
 {
     std::string http_header, http_body;
@@ -111,7 +111,7 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
       rsp = handle_OPTIONS(req);
       //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response\n%s"), rsp->length(), rsp->rd_ptr()));
     } else if(std::string::npos != req.find("GET", 0)) {
-      rsp = handle_GET(mb, dbInst); 
+      rsp = handle_GET(req, dbInst); 
     } else if(std::string::npos != req.find("POST", 0)) {
       rsp = handle_POST(mb, dbInst);
     } else if(std::string::npos != req.find("PUT", 0)) {
@@ -134,6 +134,46 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     return(ret);
 }
 
+
+ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
+{
+    size_t ct_offset = 0, cl_offset = 0;
+    /* Check for Query string */
+    Http http(in);
+    //http.parse_uri(in);
+    //http.dump();
+
+    /* Get the payload length */
+    if(std::string::npos != (ct_offset = in.find("Content-Type: ", 0)) && std::string::npos != (cl_offset = in.find("Content-Length: ", 0))) {
+        /* Both content Type & content Length are present */
+        size_t ct_offset_v = 0, cl_offset_v = 0;
+        ct_offset_v = in.find("\r\n", ct_offset);
+        cl_offset_v = in.find("\r\n", cl_offset);
+        std::string ct_match("Content-Type: ");
+        ct_offset += ct_match.length();
+        std::string cl_match("Content-Length: ");
+        cl_offset += cl_match.length();
+
+        std::string ct_value = in.substr(ct_offset, (ct_offset_v - ct_offset));
+        std::string cl_value = in.substr(cl_offset, (cl_offset_v - cl_offset));
+
+        if(!ct_value.compare("application/json")) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
+            std::string body_delimeter("\r\n\r\n");
+            size_t body_offset = in.find(body_delimeter, 0);
+            if(std::string::npos != body_offset) {
+                body_offset += body_delimeter.length();
+                std::string document = in.substr(body_offset);
+
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The query string is %s\n"), document.c_str()));
+                /* write this document into data base now.*/
+                std::string record = dbInst.get_shipment(document);
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Document from databse is %s\n"), record.c_str()));
+            }
+        }
+    }
+    return(build_responseOK());
+}
 
 ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
 {
@@ -166,7 +206,7 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
             }
         }
     }
-    return(build_responseOK());
+    return(build_responseCreated());
 }
 
 ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
@@ -191,6 +231,24 @@ ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
     return(rsp);
 }
 
+ACE_Message_Block* MicroService::build_responseCreated()
+{
+    std::string http_header;
+    ACE_Message_Block* rsp = nullptr;
+
+    http_header = "HTTP/1.1 201 Created\r\n";
+    http_header += "Connection: keep-alive\r\n";
+    http_header += "Content-Length: 0\r\n";
+
+    ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
+
+    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
+    rsp->wr_ptr(http_header.length());
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
+    return(rsp);
+}
+
 ACE_Message_Block* MicroService::build_responseOK()
 {
     std::string http_header;
@@ -208,6 +266,7 @@ ACE_Message_Block* MicroService::build_responseOK()
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
     return(rsp);
 }
+
 ACE_INT32 MicroService::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 {
 
