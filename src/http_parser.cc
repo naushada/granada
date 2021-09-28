@@ -13,10 +13,17 @@ Http::Http(const std::string& in)
 {
   m_uriName.clear();
   m_tokenMap.clear();
+  m_header.clear();
+  m_body.clear();
 
-  parse_uri(in);
-  parse_mime_header(in);
-  dump();
+  m_header = get_header(in);
+  m_body = get_body(in);
+
+  if(m_header.length()) {
+    parse_uri(m_header);
+    parse_mime_header(m_header);
+    dump();
+  }
 }
 
 Http::~Http()
@@ -122,7 +129,6 @@ void Http::parse_uri(const std::string& in)
       }
     }
   }
-
 }
 
 void Http::parse_mime_header(const std::string& in)
@@ -148,49 +154,46 @@ void Http::parse_mime_header(const std::string& in)
    */
   while(!input.eof()) {
     line_str.clear();
-      std::getline(input, line_str);
-      std::stringstream _line(line_str);
+    std::getline(input, line_str);
+    std::stringstream _line(line_str);
 
-      while(!_line.eof()) {
-        std::int32_t c = _line.get();
-
-        switch(c) {
-          case ':':
-          {
-            param = parsed_string;
-            parsed_string.clear();
-            /* getridof of first white space */
+    while(!_line.eof()) {
+      std::int32_t c = _line.get();
+      switch(c) {
+        case ':':
+        {
+          param = parsed_string;
+          parsed_string.clear();
+          /* getridof of first white space */
+          c = _line.get();
+          while(!_line.eof()) {
             c = _line.get();
-            while(!_line.eof()) {
-              c = _line.get();
-              switch(c) {
-                case '\r':
-                case ' ':
-                  /* get rid of \r character */
-                  break;
+            switch(c) {
+              case '\r':
+              case ' ':
+                /* get rid of \r character */
+                break;
 
                 default:
                   parsed_string.push_back(c);
                   break;
-              }
             }
-
-            /* we hit the end of line */
-            value = parsed_string;
-            add_element(param, value);
-            parsed_string.clear();
-            param.clear();
-            value.clear();
           }
-            break;
-
-          default:
-            parsed_string.push_back(c);
-            break;
+          /* we hit the end of line */
+          value = parsed_string;
+          add_element(param, value);
+          parsed_string.clear();
+          param.clear();
+          value.clear();
         }
-      }
-  }
+          break;
 
+        default:
+          parsed_string.push_back(c);
+          break;
+      }
+    }
+  }
 }
 
 void Http::dump(void) const 
@@ -202,5 +205,40 @@ void Http::dump(void) const
 
 }
 
+std::string Http::get_header(const std::string& in)
+{
+
+  if(!in.compare("application/json")) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
+    std::string body_delimeter("\r\n\r\n");
+    size_t body_offset = in.find(body_delimeter, 0);
+    if(std::string::npos != body_offset) {
+      body_offset += body_delimeter.length();
+      std::string document = in.substr(0, body_offset);
+
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The header is %s\n"), document.c_str()));
+      return(document);
+    }
+  }
+  return(std::string(in));
+}
+
+std::string Http::get_body(const std::string& in)
+{
+
+  if(!in.compare("application/json")) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
+    std::string body_delimeter("\r\n\r\n");
+    size_t body_offset = in.find(body_delimeter, 0);
+    if(std::string::npos != body_offset) {
+      body_offset += body_delimeter.length();
+      std::string document = in.substr(body_offset);
+
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The body is %s\n"), document.c_str()));
+      return(document);
+    }
+  }
+  return(std::string());
+}
 
 #endif /* __http_parser_cc__ */

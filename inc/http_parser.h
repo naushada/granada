@@ -37,10 +37,14 @@ class Http {
     void parse_uri(const std::string& in);
     void parse_mime_header(const std::string& in);
     void dump(void) const;
+    std::string get_body(const std::string& in);
+    std::string get_header(const std::string& in);
 
   private:
     std::unordered_map<std::string, std::string> m_tokenMap;
     std::string m_uriName;
+    std::string m_header;
+    std::string m_body;
 };
 
 #endif /* __http_parser_h__ */
