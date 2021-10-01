@@ -3,13 +3,28 @@
 
 #include "webservice.h"
 
-int main()
+int main(int argc, char* argv[])
 {
-    WebServer inst("", 8080);
-    
-    inst.start();
+   std::string ip("");
+   std::string port("");
+   int _port = 8080;
 
-    return(0);
+   if(argc > 1) {
+
+     ip.assign(argv[1]);
+     port.assign(argv[2]);
+     _port = std::stoi(port);
+     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l IP %s port %d\n"), ip.c_str(), _port));
+
+   } else {
+     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the ip 0.0.0.0 and port 8080\n")));
+   }
+
+    
+   WebServer inst(ip, _port);
+   inst.start();
+
+   return(0);
 }
 
 
