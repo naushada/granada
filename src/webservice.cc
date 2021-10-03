@@ -170,6 +170,21 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
                 std::string record = dbInst.get_shipment(document);
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Document from databse is %s\n"), record.c_str()));
             }
+        } else {
+          /* Action based on uri in get request */
+          std::string uri(http.get_uriName());
+
+          if(!uri.compare("/api/login")) {
+            /* user is trying to log in - authenticate now */
+            auto user = http.get_element("username");
+	        auto pwd = http.get_element("password");
+
+            if(user.length() && pwd.length()) {
+              /* do an authentication with DB now */
+              std::string document = "{\"username\" : \"" + user + "\", \"password\" : \"" + pwd + "\"}";
+              std::int32_t record = dbInst.validate_user(document);
+            } 
+          }
         }
     }
     return(build_responseOK());
@@ -420,7 +435,7 @@ ACE_HANDLE WebServer::get_handle() const
     return(m_server.get_handle());
 }
 
-WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort)
+WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 workerPool)
 {
     std::string addr;
     addr.clear();
@@ -444,7 +459,7 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort)
 
     m_workerPool.clear();
     std::uint32_t cnt;
-    for(cnt = 0; cnt < 5; ++cnt) {
+    for(cnt = 0; cnt < workerPool; ++cnt) {
         MicroService* worker = nullptr;
         ACE_NEW_NORETURN(worker, MicroService(ACE_Thread_Manager::instance()));
         m_workerPool.push_back(worker);

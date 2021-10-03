@@ -10,6 +10,9 @@ include_directories(/usr/local/include/bsoncxx/v_noabi)
 
 link_directories(/usr/lib/x86_64-linux-gnu)
 
+include_directories(/usr/local/ACE_TAO-7.0.0/include)
+link_directories(/usr/local/ACE_TAO-7.0.0/lib)
+
 #Adding Complier flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -Wall -Wextra")
 
@@ -20,4 +23,5 @@ add_library(mongodbc STATIC ${SOURCES})
 
 target_link_libraries(mongodbc bsoncxx)
 target_link_libraries(mongodbc mongocxx)
+target_link_libraries(mongodbc ACE)
 

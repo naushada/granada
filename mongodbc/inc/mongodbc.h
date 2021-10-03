@@ -17,6 +17,8 @@
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/builder/stream/array.hpp>
 
+#include "ace/Log_Msg.h"
+
 enum class CollectionName : std::uint32_t {
     SHIPPING = 0,
     JOB_SCHEDULING,
@@ -65,6 +67,7 @@ class Mongodbc {
         bool delete_shipment(std::string shippingRecord);
         std::string get_shipment(std::string key);
         void dump_document(CollectionName collection);
+        std::int32_t validate_user(std::string document);
 
     private:
         std::string mURI;

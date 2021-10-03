@@ -54,6 +54,7 @@ Mongodbc::Mongodbc(std::string uri_str, std::string db_name, std::uint32_t poolS
             mMongoConnPool = new mongocxx::pool(uri);
 
             if(nullptr == mMongoConnPool) {
+                ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l instantiation of MongoConnPool is failed\n")));
                 break;
             }
         }
@@ -158,5 +159,20 @@ std::string Mongodbc::get_shipment(std::string criteria)
     json_object =  bsoncxx::to_json(result.view());
     #endif
     return(json_object);
+}
+
+std::int32_t Mongodbc::validate_user(std::string criteria)
+{
+    std::string json_object;
+    bsoncxx::document::value filter = bsoncxx::from_json(criteria.c_str());
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection("login");
+    bsoncxx::stdx::optional<mongocxx::cursor> result = collection.find(filter.view());
+    //auto result = collection.find(filter.view());
+    //std::cout << bsoncxx::to_json(result) << std::endl;
+    //auto it = result.begin();
+
+  return(0);
 }
 #endif /* __mongodbc_cc__*/
