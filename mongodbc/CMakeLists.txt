@@ -19,9 +19,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -Wall -Wextra")
 #However, the file(GLOB...) allows for wildcard additions:
 file(GLOB SOURCES "src/*.cc")
 
-add_library(mongodbc STATIC ${SOURCES})
+add_library(mongodbcxx STATIC ${SOURCES})
 
-target_link_libraries(mongodbc bsoncxx)
-target_link_libraries(mongodbc mongocxx)
-target_link_libraries(mongodbc ACE)
+target_link_libraries(mongodbcxx bsoncxx)
+target_link_libraries(mongodbcxx mongocxx)
+target_link_libraries(mongodbcxx ACE)
 

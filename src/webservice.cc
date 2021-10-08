@@ -435,7 +435,7 @@ ACE_HANDLE WebServer::get_handle() const
     return(m_server.get_handle());
 }
 
-WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 workerPool)
+WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 workerPool, std::string dbUri, std::string dbConnPool, std::string dbName)
 {
     std::string addr;
     addr.clear();
@@ -470,8 +470,22 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
 
     /* Mongo DB interface */
     std::string uri("mongodb://127.0.0.1:27017");
-    std::string dbName("bayt");
-    mMongodbc = new Mongodbc(uri, dbName);
+    std::string _dbName("bayt");
+    std::uint32_t _pool = 50;
+
+    if(dbUri.length()) {
+        uri.assign(dbUri);
+    }
+
+    if(dbConnPool.length()) {
+        _pool = std::stoi(dbConnPool);
+    }
+
+    if(dbName.length()) {
+        _dbName.assign(dbName);
+    }
+
+    mMongodbc = new Mongodbc(uri, _dbName, _pool);
 }
 
 WebServer::~WebServer()

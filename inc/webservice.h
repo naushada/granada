@@ -41,6 +41,16 @@ enum class MemorySize : std::uint32_t {
     SIZE_1M = (SIZE_1KB * SIZE_1KB)
 };
 
+enum class CommandArgumentName : std::uint32_t {
+    SERVER_IP = 0,
+    SERVER_PORT,
+    SERVER_WORKER_NODE,
+    DB_URI,
+    DB_CONN_POOL,
+    DB_NAME,
+    MAX_CMD_ARG
+};
+
 class MicroService : public ACE_Task<ACE_MT_SYNCH> {
     public:
 
@@ -135,7 +145,7 @@ class WebServer : public ACE_Event_Handler {
         ACE_INT32 handle_close (ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = 0) override;
         ACE_HANDLE get_handle() const override;
 
-        WebServer(std::string _ip, ACE_UINT16 _port, ACE_UINT32 workerPool = 10);
+        WebServer(std::string _ip, ACE_UINT16 _port, ACE_UINT32 workerPool, std::string dbUri, std::string dbConnPool, std::string dbName);
         ~WebServer();
         bool start();
         bool stop();

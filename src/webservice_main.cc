@@ -10,18 +10,26 @@ int main(int argc, char* argv[])
    std::string worker("");
    std::string db_uri("");
    std::string db_conn_pool("");
+   std::string db_name("");
+
+   std::array<std::string, std::size_t(CommandArgumentName::MAX_CMD_ARG)> cmdOpt;
+
    int _port = 8080;
    int _worker = 10;
    int _pool = 50;
-   
+
+   cmdOpt.fill("");
+
    ACE_LOG_MSG->open (argv[0]);
 
-   ACE_Get_Opt opts (argc, argv, ACE_TEXT ("s:p:w:m:c:h:"), 1);
+   /* The last argument tells from where to start in argv - offset of argv array */
+   ACE_Get_Opt opts (argc, argv, ACE_TEXT ("s:p:w:u:c:h:d:"), 1);
    opts.long_option (ACE_TEXT ("server-ip"), 's', ACE_Get_Opt::ARG_REQUIRED);
    opts.long_option (ACE_TEXT ("server-port"), 'p', ACE_Get_Opt::ARG_REQUIRED);
    opts.long_option (ACE_TEXT ("server-worker"), 'w', ACE_Get_Opt::ARG_REQUIRED);
-   opts.long_option (ACE_TEXT ("mongo-db-uri"), 'm', ACE_Get_Opt::ARG_REQUIRED);
+   opts.long_option (ACE_TEXT ("mongo-db-uri"), 'u', ACE_Get_Opt::ARG_REQUIRED);
    opts.long_option (ACE_TEXT ("mongo-db-connection-pool"), 'c', ACE_Get_Opt::ARG_REQUIRED);
+   opts.long_option (ACE_TEXT ("mongo-db-name"), 'd', ACE_Get_Opt::ARG_REQUIRED);
    opts.long_option (ACE_TEXT ("help"), 'h', ACE_Get_Opt::ARG_REQUIRED);
    int c = 0;
 
@@ -29,7 +37,9 @@ int main(int argc, char* argv[])
      switch (c) {
        case 's':
        {
-         ACE_TCHAR* i = opts.opt_arg();
+         cmdOpt[std::size_t(CommandArgumentName::SERVER_IP)] = std::string(opts.opt_arg());
+         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l IP %s\n"), std::get<std::size_t(CommandArgumentName::SERVER_IP)>(cmdOpt).c_str()));
+         #if 0
          if(!i) {
            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [master:%t] %M %N:%l IP value is zero\n")));
          } else {
@@ -37,28 +47,37 @@ int main(int argc, char* argv[])
            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l IP %s\n"), tmp.c_str()));
            ip.assign(i);
          }
+         #endif
        }
          break;
 
        case 'p':
        {
-         ACE_TCHAR* p = opts.opt_arg();
-         std::string tmp(p);
-         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l PORT %s\n"), tmp.c_str()));
-         port.assign(tmp);
+         cmdOpt[std::size_t(CommandArgumentName::SERVER_PORT)] = std::string(opts.opt_arg());
+         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l PORT %s\n"), std::get<std::size_t(CommandArgumentName::SERVER_PORT)>(cmdOpt).c_str()));
        }
          break;
 
        case 'w':
-         worker.assign(opts.opt_arg());
+       {
+         cmdOpt[std::size_t(CommandArgumentName::SERVER_WORKER_NODE)] = std::string(opts.opt_arg());
+         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l Worker Nodes %s\n"), std::get<std::size_t(CommandArgumentName::SERVER_WORKER_NODE)>(cmdOpt).c_str()));
+       }
          break;
 
-       case 'm':
-         db_uri.assign(opts.opt_arg());
+       case 'u':
+         cmdOpt[std::size_t(CommandArgumentName::DB_URI)] = std::string(opts.opt_arg());
+         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l Database URI %s\n"), std::get<std::size_t(CommandArgumentName::DB_URI)>(cmdOpt).c_str()));
          break;
          
        case 'c':
-         db_conn_pool.assign(opts.opt_arg());
+         cmdOpt[std::size_t(CommandArgumentName::DB_CONN_POOL)] = std::string(opts.opt_arg());
+         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l Database Connection Pool %s\n"), std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt).c_str()));
+         break;
+
+       case 'd':
+         cmdOpt[std::size_t(CommandArgumentName::DB_NAME)] = std::string(opts.opt_arg());
+         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l Database Name %s\n"), std::get<std::size_t(CommandArgumentName::DB_NAME)>(cmdOpt).c_str()));
          break;
 
        case 'h':
@@ -68,8 +87,9 @@ int main(int argc, char* argv[])
                             " [-s --server-ip]\n"
                             " [-p --server-port]\n"
                             " [-w --server-worker]\n"
-                            " [-m --mongo-db-uri]\n"
+                            " [-u --mongo-db-uri (mongodb://127.0.0.1:27017)]\n"
                             " [-c --mongo-db-connection-pool]\n"
+                            " [-d --mongo-db-name]\n"
                             " [-h --help]\n"
                             ),
                             argv [0]),
@@ -77,23 +97,24 @@ int main(int argc, char* argv[])
      }
    }
 
-   if(port.length()) {
-     _port = std::stoi(port);
-     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l IP %s port %d\n"), ip.c_str(), _port));
+   if(std::get<std::size_t(CommandArgumentName::SERVER_PORT)>(cmdOpt).length()) {
+     _port = std::stoi(std::get<std::size_t(CommandArgumentName::SERVER_PORT)>(cmdOpt));
+     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l port %d\n"), _port));
 
    }
 
-   if(worker.length()) {
-     _worker = std::stoi(worker);
+   if(std::get<std::size_t(CommandArgumentName::SERVER_WORKER_NODE)>(cmdOpt).length()) {
+     _worker = std::stoi(std::get<std::size_t(CommandArgumentName::SERVER_WORKER_NODE)>(cmdOpt));
      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l the number of worker is %d\n"), _worker));
    }
    
-   if(db_conn_pool.length()) {
-     _pool = std::stoi(db_conn_pool);
+   if(std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt).length()) {
+     _pool = std::stoi(std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt));
      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l the db connection pool is %d\n"), _pool));
    } 
 
-   WebServer inst(ip, _port, _worker);
+   WebServer inst(std::get<std::size_t(CommandArgumentName::SERVER_IP)>(cmdOpt), _port, _worker, std::get<std::size_t(CommandArgumentName::DB_URI)>(cmdOpt),
+                  std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt), std::get<std::size_t(CommandArgumentName::DB_NAME)>(cmdOpt));
    inst.start();
 
    return(0);
