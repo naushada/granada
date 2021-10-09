@@ -84,7 +84,7 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
         ACE_Message_Block* handle_POST(std::string& in, Mongodbc& dbInst);
         ACE_Message_Block* handle_PUT(std::string& in, Mongodbc& dbInst);
         ACE_Message_Block* handle_DELETE(std::string& in, Mongodbc& dbInst);
-        ACE_Message_Block* build_responseOK();
+        ACE_Message_Block* build_responseOK(std::string http_body);
         ACE_Message_Block* build_responseCreated();
 
     private:

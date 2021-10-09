@@ -143,6 +143,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
     //http.parse_uri(in);
     //http.dump();
 
+#if 0
     /* Get the payload length */
     if(std::string::npos != (ct_offset = in.find("Content-Type: ", 0)) && std::string::npos != (cl_offset = in.find("Content-Length: ", 0))) {
         /* Both content Type & content Length are present */
@@ -187,7 +188,30 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
           }
         }
     }
-    return(build_responseOK());
+    #endif
+
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l API Name %s\n"), uri.c_str()));
+    if(!uri.compare("/api/login")) {
+        std::string collectionName("login");
+
+        /* user is trying to log in - authenticate now */
+        auto user = http.get_element("username");
+	    auto pwd = http.get_element("password");
+
+        if(user.length() && pwd.length()) {
+            /* do an authentication with DB now */
+            std::string document = "{\"username\" : \"" + user + "\"}";
+            std::string projection("{\"username\" : true, \"_id\" : false}");
+            std::string record = dbInst.validate_user(collectionName, document, projection);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l User or Customer details %s\n"), record.c_str()));
+            return(build_responseOK(record));
+        } 
+    }
+
+    return(build_responseOK(std::string()));
 }
 
 ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
@@ -264,16 +288,25 @@ ACE_Message_Block* MicroService::build_responseCreated()
     return(rsp);
 }
 
-ACE_Message_Block* MicroService::build_responseOK()
+ACE_Message_Block* MicroService::build_responseOK(std::string httpBody)
 {
     std::string http_header;
     ACE_Message_Block* rsp = nullptr;
 
     http_header = "HTTP/1.1 200 OK\r\n";
     http_header += "Connection: keep-alive\r\n";
-    http_header += "Content-Length: 0\r\n";
 
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
+    if(httpBody.length()) {
+        http_header += "Content-Length: " + std::to_string(httpBody.length()) + "\r\n";
+        http_header += "Content-Type: application/json\r\n";
+        http_header += "\r\n";
+        http_header += httpBody;
+
+    } else {
+        http_header += "Content-Length: 0\r\n";
+    }
+
+    ACE_NEW_RETURN(rsp, ACE_Message_Block(1024), nullptr);
 
     std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
     rsp->wr_ptr(http_header.length());

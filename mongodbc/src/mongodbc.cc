@@ -161,18 +161,23 @@ std::string Mongodbc::get_shipment(std::string criteria)
     return(json_object);
 }
 
-std::int32_t Mongodbc::validate_user(std::string criteria)
+std::string Mongodbc::validate_user(std::string collectionName, std::string query, std::string fieldProjection)
 {
-    std::string json_object;
-    bsoncxx::document::value filter = bsoncxx::from_json(criteria.c_str());
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Query %s\n"), query.c_str()));
+    bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
     auto conn = mMongoConnPool->acquire();
     mongocxx::database dbInst = conn->database(get_dbName().c_str());
-    auto collection = dbInst.collection("login");
-    bsoncxx::stdx::optional<mongocxx::cursor> result = collection.find(filter.view());
-    //auto result = collection.find(filter.view());
-    //std::cout << bsoncxx::to_json(result) << std::endl;
-    //auto it = result.begin();
+    auto collection = dbInst.collection(collectionName.c_str());
+    mongocxx::options::find opts{};
+    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
+    auto resultFormat = opts.projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+    bsoncxx::document::view res = *cursor.begin();
 
-  return(0);
+    for (auto&& doc : cursor) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Result %s\n"), bsoncxx::to_json(doc).c_str()));
+    }
+
+    return(std::string(bsoncxx::to_json(res).c_str()));
 }
 #endif /* __mongodbc_cc__*/
