@@ -66,7 +66,7 @@ class Mongodbc {
         bool create_shipment(std::string shippingRecord);
         bool update_shipment(std::string match, std::string shippingRecord);
         bool delete_shipment(std::string shippingRecord);
-        std::string get_shipment(std::string key);
+        std::string get_shipment(std::string collectionName, std::string key, std::string fieldProjection);
         void dump_document(CollectionName collection);
         std::string validate_user(std::string collectionName, std::string query, std::string fieldProjection);
 

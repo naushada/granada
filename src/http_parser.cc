@@ -39,11 +39,12 @@ void Http::parse_uri(const std::string& in)
   if(std::string::npos != offset) {
     /* Qstring */
     std::string req = in.substr(0, offset);
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The query string is %s\n"), req.c_str()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The request string is %s\n"), req.c_str()));
     std::stringstream input(req);
     std::string parsed_string;
     std::string param;
     std::string value;
+    bool isQsPresent = false;
 
     parsed_string.clear();
     param.clear();
@@ -63,8 +64,13 @@ void Http::parse_uri(const std::string& in)
 
           std::string p((const char *)endCode, 4);
           if(!p.compare("HTTP")) {
-            value = parsed_string;
-            add_element(param, value);
+            if(!isQsPresent) {
+              m_uriName = parsed_string;
+              parsed_string.clear();
+            } else {
+              value = parsed_string;
+              add_element(param, value);
+            }
           } else {
             /* make available to stream to be get again*/
             input.unget();
@@ -87,6 +93,7 @@ void Http::parse_uri(const std::string& in)
 
         case '?':
         {
+          isQsPresent = true;
           m_uriName = parsed_string;
           parsed_string.clear();
         }

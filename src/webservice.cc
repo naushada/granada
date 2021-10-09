@@ -209,6 +209,19 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l User or Customer details %s\n"), record.c_str()));
             return(build_responseOK(record));
         } 
+    } else if(!uri.compare("/api/shipping")) {
+        std::string collectionName("shipping");
+        std::string billTo("Z1234567");
+
+        if(1) {
+            /* do an authentication with DB now */
+            std::string document = "{\"senderInformation.billTo\" : \"" + billTo + "\"}";
+            std::string projection("{\"_id\" : false}");
+            std::string record = dbInst.get_shipment(collectionName, document, projection);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Airo Bills %s\n"), record.c_str()));
+            return(build_responseOK(record));
+        } 
+
     }
 
     return(build_responseOK(std::string()));
@@ -306,7 +319,7 @@ ACE_Message_Block* MicroService::build_responseOK(std::string httpBody)
         http_header += "Content-Length: 0\r\n";
     }
 
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(1024), nullptr);
+    ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1M)), nullptr);
 
     std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
     rsp->wr_ptr(http_header.length());

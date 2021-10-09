@@ -143,22 +143,34 @@ bool Mongodbc::delete_shipment(std::string shippingRecord)
 {
     return(true);
 }
-std::string Mongodbc::get_shipment(std::string criteria)
+std::string Mongodbc::get_shipment(std::string collectionName, std::string query, std::string fieldProjection)
 {
     std::string json_object;
-    bsoncxx::document::value filter = bsoncxx::from_json(criteria.c_str());
+    bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
     auto conn = mMongoConnPool->acquire();
     mongocxx::database dbInst = conn->database(get_dbName().c_str());
-    auto collection = dbInst.collection("shipping");
+    auto collection = dbInst.collection(collectionName.c_str());
+
+    mongocxx::options::find opts{};
+    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
+    auto resultFormat = opts.projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+    bsoncxx::document::view res = *cursor.begin();
+
+    for (auto&& doc : cursor) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Aero Bill %s\n"), bsoncxx::to_json(doc).c_str()));
+    }
+
+    return(std::string(bsoncxx::to_json(res).c_str()));
+
+    #if 0
     //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
     bsoncxx::stdx::optional<mongocxx::cursor> result = collection.find(filter.view());
-    #if 0
     bsoncxx::document::value what = bsoncxx::from_json(key.c_str());
     json_object.clear();
     bsoncxx::stdx::optional<bsoncxx::document::value> result = get_collection(CollectionName::SHIPPING).find_one(what);
     json_object =  bsoncxx::to_json(result.view());
     #endif
-    return(json_object);
 }
 
 std::string Mongodbc::validate_user(std::string collectionName, std::string query, std::string fieldProjection)
