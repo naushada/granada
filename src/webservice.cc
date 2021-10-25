@@ -127,13 +127,60 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
 
       std::string response(rsp->rd_ptr(), rsp->length());
       rsp->release();
-      ret = send(handle, response.c_str(), response.length(), 0);
+      std::int32_t  toBeSent = response.length();
+      std::int32_t offset = 0;
+      do {
+        ret = send(handle, (response.c_str() + offset), (toBeSent - offset), 0);
+        if(ret < 0) {
+          ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l sent to peer is failed\n")));
+          break;
+        }
+        offset += ret;
+        ret = 0;
+      } while((toBeSent != offset));
 
-      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response\n%s bytes sent %d\n"), response.length(), response.c_str(), ret));
+      //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d bytes sent %d\n"), response.length(), offset));
     }
     return(ret);
 }
 
+std::string MicroService::get_contentType(std::string ext)
+{
+    std::string cntType("");
+    /* get the extension now for content-type*/
+    if(!ext.compare("woff")) {
+      cntType = "font/woff";
+    } else if(!ext.compare("woff2")) {
+      cntType = "font/woff2";
+    } else if(!ext.compare("ttf")) {
+      cntType = "font/ttf";
+    } else if(!ext.compare("otf")) {
+      cntType = "font/otf";
+    } else if(!ext.compare("css")) {
+      cntType = "text/css";
+    } else if(!ext.compare("js")) {
+      cntType = "text/javascript";
+    } else if(!ext.compare("eot")) {
+      cntType = "application/vnd.ms-fontobject";
+    } else if(!ext.compare("html")) {
+      cntType = "text/html";
+    } else if(!ext.compare("svg")) {
+      cntType = "image/svg+xml";
+    } else if(!ext.compare("gif")) {
+      cntType ="image/gif";
+    } else if(!ext.compare("png")) {
+      cntType = "image/png";
+    } else if(!ext.compare("ico")) {
+      cntType = "image/vnd.microsoft.icon";
+    } else if(!ext.compare("jpg")) {
+      cntType = "image/jpeg";
+    } else if(!ext.compare("json")) {
+      cntType = "application/json";
+    } else {
+      cntType = "text/html";
+    }
+    return(cntType);
+}
 
 ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 {
@@ -218,10 +265,60 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             std::string document = "{\"senderInformation.billTo\" : \"" + billTo + "\"}";
             std::string projection("{\"_id\" : false}");
             std::string record = dbInst.get_shipment(collectionName, document, projection);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Airo Bills %s\n"), record.c_str()));
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l AWB Way Bills %s\n"), record.c_str()));
             return(build_responseOK(record));
         } 
+    } else if((!uri.compare(0, 6, "/bayt/"))) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
+        /* build the file name now */
+        std::string fileName("");
+        std::string ext("");
 
+        std::size_t found = uri.find_last_of(".");
+        if(found != std::string::npos) {
+          ext = uri.substr((found + 1), (uri.length() - found));
+          fileName = uri.substr(6, (uri.length() - 6));
+          std::string newFile = "../../webgui/webclient/sw/" + fileName;
+          ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s The extension is %s\n"), newFile.c_str(), ext.c_str()));
+          /* Open the index.html file and send it to web browser. */
+          std::ifstream ifs(newFile.c_str());
+          std::stringstream _str("");
+
+          if(ifs.is_open()) {
+              ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Request file %s - open successfully.\n"), uri.c_str()));
+              std::string cntType("");
+              cntType = get_contentType(ext); 
+
+              _str << ifs.rdbuf();
+              ifs.close();
+              return(build_responseOK(_str.str(), cntType));
+          }
+        }
+    } else if(!uri.compare(0, 8, "/assets/")) {
+        /* build the file name now */
+        std::string fileName("");
+        std::string ext("");
+
+        std::size_t found = uri.find_last_of(".");
+        if(found != std::string::npos) {
+          ext = uri.substr((found + 1), (uri.length() - found));
+          std::string newFile = "../../webgui/webclient/sw" + uri;
+          ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s The extension is %s\n"), newFile.c_str(), ext.c_str()));
+          /* Open the index.html file and send it to web browser. */
+          std::ifstream ifs(newFile.c_str(), ios::binary);
+          std::stringstream _str("");
+          std::string cntType("");
+
+          if(ifs.is_open()) {
+              ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Request file %s - open successfully.\n"), uri.c_str()));
+
+              cntType = get_contentType(ext);
+              _str << ifs.rdbuf();
+              ifs.close();
+
+              return(build_responseOK(_str.str(), cntType));
+          }
+        }
     }
 
     return(build_responseOK(std::string()));
@@ -301,7 +398,7 @@ ACE_Message_Block* MicroService::build_responseCreated()
     return(rsp);
 }
 
-ACE_Message_Block* MicroService::build_responseOK(std::string httpBody)
+ACE_Message_Block* MicroService::build_responseOK(std::string httpBody, std::string contentType)
 {
     std::string http_header;
     ACE_Message_Block* rsp = nullptr;
@@ -311,20 +408,21 @@ ACE_Message_Block* MicroService::build_responseOK(std::string httpBody)
 
     if(httpBody.length()) {
         http_header += "Content-Length: " + std::to_string(httpBody.length()) + "\r\n";
-        http_header += "Content-Type: application/json\r\n";
+        http_header += "Content-Type: " + contentType + "\r\n";
         http_header += "\r\n";
-        http_header += httpBody;
 
     } else {
         http_header += "Content-Length: 0\r\n";
     }
 
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1M)), nullptr);
+    ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1KB) + httpBody.length()), nullptr);
 
     std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
     rsp->wr_ptr(http_header.length());
+    std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
+    rsp->wr_ptr(httpBody.length());
 
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response header\n%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
     return(rsp);
 }
 
@@ -563,7 +661,7 @@ bool WebServer::stop()
 long WebServer::start_conn_cleanup_timer(ACE_HANDLE handle)
 {
     long timerId = -1;
-    ACE_Time_Value to(5,0);
+    ACE_Time_Value to(20,0);
     timerId = ACE_Reactor::instance()->schedule_timer(this, (const void *)handle, to);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l webserver cleanup timer is started for handle %d\n"), handle));
     return(timerId);

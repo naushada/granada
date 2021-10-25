@@ -5,6 +5,8 @@
 #include <memory>
 #include <unordered_map>
 #include <algorithm>
+#include <iostream>
+#include <fstream>
 
 #include "ace/Reactor.h"
 #include "ace/Basic_Types.h"
@@ -84,8 +86,9 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
         ACE_Message_Block* handle_POST(std::string& in, Mongodbc& dbInst);
         ACE_Message_Block* handle_PUT(std::string& in, Mongodbc& dbInst);
         ACE_Message_Block* handle_DELETE(std::string& in, Mongodbc& dbInst);
-        ACE_Message_Block* build_responseOK(std::string http_body);
+        ACE_Message_Block* build_responseOK(std::string http_body, std::string content_type="application/json");
         ACE_Message_Block* build_responseCreated();
+        std::string get_contentType(std::string _ext);
 
     private:
         bool m_continue;
