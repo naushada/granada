@@ -147,7 +147,7 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
 std::string MicroService::get_contentType(std::string ext)
 {
     std::string cntType("");
-    /* get the extension now for content-type*/
+    /* get the extension now for content-type */
     if(!ext.compare("woff")) {
       cntType = "font/woff";
     } else if(!ext.compare("woff2")) {
@@ -278,7 +278,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         if(found != std::string::npos) {
           ext = uri.substr((found + 1), (uri.length() - found));
           fileName = uri.substr(6, (uri.length() - 6));
-          std::string newFile = "../../webgui/webclient/sw/" + fileName;
+          std::string newFile = "../webgui/sw/" + fileName;
           ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s The extension is %s\n"), newFile.c_str(), ext.c_str()));
           /* Open the index.html file and send it to web browser. */
           std::ifstream ifs(newFile.c_str());
@@ -302,7 +302,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         std::size_t found = uri.find_last_of(".");
         if(found != std::string::npos) {
           ext = uri.substr((found + 1), (uri.length() - found));
-          std::string newFile = "../../webgui/webclient/sw" + uri;
+          std::string newFile = "../webgui/sw" + uri;
           ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s The extension is %s\n"), newFile.c_str(), ext.c_str()));
           /* Open the index.html file and send it to web browser. */
           std::ifstream ifs(newFile.c_str(), ios::binary);
@@ -318,6 +318,23 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
               return(build_responseOK(_str.str(), cntType));
           }
+        }
+    } else if(!uri.compare(0, 1, "/")) {
+        std::string newFile = "../webgui/sw/index.html";
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s \n"), newFile.c_str()));
+        /* Open the index.html file and send it to web browser. */
+        std::ifstream ifs(newFile.c_str(), ios::binary);
+        std::stringstream _str("");
+        std::string cntType("");
+
+        if(ifs.is_open()) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Request file %s - open successfully.\n"), uri.c_str()));
+
+            cntType = "text/html";
+            _str << ifs.rdbuf();
+            ifs.close();
+
+            return(build_responseOK(_str.str(), cntType));
         }
     }
 
