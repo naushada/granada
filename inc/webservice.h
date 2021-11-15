@@ -21,6 +21,7 @@
 #include "ace/OS_Memory.h"
 #include "ace/Thread_Manager.h"
 #include "ace/Get_Opt.h"
+#include "ace/Signal.h"
 
 #include "mongodbc.h"
 
@@ -40,7 +41,9 @@ enum class MemorySize : std::uint32_t {
     SIZE_1KB = 1024,
     SIZE_5KB = (5 * SIZE_1KB),
     SIZE_10KB = (10 * SIZE_1KB),
-    SIZE_1M = (SIZE_1KB * SIZE_1KB)
+    SIZE_1MB = (SIZE_1KB * SIZE_1KB),
+    SIZE_10MB = (10 * SIZE_1MB),
+    SIZE_50MB = (50 * SIZE_1MB)
 };
 
 enum class CommandArgumentName : std::uint32_t {

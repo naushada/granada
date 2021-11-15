@@ -17,13 +17,14 @@ Http::Http(const std::string& in)
   m_body.clear();
 
   m_header = get_header(in);
-  m_body = get_body(in);
 
   if(m_header.length()) {
     parse_uri(m_header);
     parse_mime_header(m_header);
-    dump();
+    //dump();
   }
+
+  m_body = get_body(in);
 }
 
 Http::~Http()
@@ -50,9 +51,8 @@ void Http::parse_uri(const std::string& in)
     param.clear();
     value.clear();
 
-    while(!input.eof()) {
-
-      std::int32_t c = input.get();
+    std::int32_t c;
+    while((c = input.get()) != EOF) {
       switch(c) {
         case ' ':
         {
@@ -164,8 +164,8 @@ void Http::parse_mime_header(const std::string& in)
     std::getline(input, line_str);
     std::stringstream _line(line_str);
 
-    while(!_line.eof()) {
-      std::int32_t c = _line.get();
+    std::int32_t c;
+    while((c = _line.get()) != EOF ) {
       switch(c) {
         case ':':
         {
@@ -173,17 +173,16 @@ void Http::parse_mime_header(const std::string& in)
           parsed_string.clear();
           /* getridof of first white space */
           c = _line.get();
-          while(!_line.eof()) {
-            c = _line.get();
+          while((c = _line.get()) != EOF) {
             switch(c) {
               case '\r':
               case ' ':
                 /* get rid of \r character */
                 break;
 
-                default:
-                  parsed_string.push_back(c);
-                  break;
+              default:
+                parsed_string.push_back(c);
+                break;
             }
           }
           /* we hit the end of line */
@@ -232,9 +231,18 @@ std::string Http::get_header(const std::string& in)
 
 std::string Http::get_body(const std::string& in)
 {
+  std::string ct = get_element("Content-Type");
+  std::string contentLen = get_element("Content-Length");
+  std::string ty("application/json");
 
-  if(!in.compare("application/json")) {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is %s and CL %d payload length %d\n"), ct.c_str(),std::stoi(contentLen), in.length()));
+  if(!ct.compare("application/json")) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json CL %d\n"), std::stoi(contentLen)));
+    std::uint32_t offset = in.length() - std::stoi(contentLen);
+    std::string document = in.substr(offset, std::stoi(contentLen));
+    return(document);
+
+    #if 0
     std::string body_delimeter("\r\n\r\n");
     size_t body_offset = in.find(body_delimeter, 0);
     if(std::string::npos != body_offset) {
@@ -244,6 +252,7 @@ std::string Http::get_body(const std::string& in)
       ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The body is %s\n"), document.c_str()));
       return(document);
     }
+    #endif
   }
   return(std::string());
 }

@@ -113,7 +113,7 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     } else if(std::string::npos != req.find("GET", 0)) {
       rsp = handle_GET(req, dbInst); 
     } else if(std::string::npos != req.find("POST", 0)) {
-      rsp = handle_POST(mb, dbInst);
+      rsp = handle_POST(req, dbInst);
     } else if(std::string::npos != req.find("PUT", 0)) {
       rsp = handle_PUT(req, dbInst);
     } else if(std::string::npos != req.find("DELETE", 0)) {
@@ -182,60 +182,29 @@ std::string MicroService::get_contentType(std::string ext)
     return(cntType);
 }
 
+ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/shipping")) {
+        std::string collectionName("shipping");
+        std::string content = http.body();
+        if(content.length()) {
+            bool record = dbInst.create_shipment(content);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document->\n %s\n"), content.c_str()));
+        } 
+    }
+    return(build_responseOK(std::string()));
+}
+
 ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 {
     size_t ct_offset = 0, cl_offset = 0;
     /* Check for Query string */
     Http http(in);
-    //http.parse_uri(in);
-    //http.dump();
-
-#if 0
-    /* Get the payload length */
-    if(std::string::npos != (ct_offset = in.find("Content-Type: ", 0)) && std::string::npos != (cl_offset = in.find("Content-Length: ", 0))) {
-        /* Both content Type & content Length are present */
-        size_t ct_offset_v = 0, cl_offset_v = 0;
-        ct_offset_v = in.find("\r\n", ct_offset);
-        cl_offset_v = in.find("\r\n", cl_offset);
-        std::string ct_match("Content-Type: ");
-        ct_offset += ct_match.length();
-        std::string cl_match("Content-Length: ");
-        cl_offset += cl_match.length();
-
-        std::string ct_value = in.substr(ct_offset, (ct_offset_v - ct_offset));
-        std::string cl_value = in.substr(cl_offset, (cl_offset_v - cl_offset));
-
-        if(!ct_value.compare("application/json")) {
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
-            std::string body_delimeter("\r\n\r\n");
-            size_t body_offset = in.find(body_delimeter, 0);
-            if(std::string::npos != body_offset) {
-                body_offset += body_delimeter.length();
-                std::string document = in.substr(body_offset);
-
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The query string is %s\n"), document.c_str()));
-                /* write this document into data base now.*/
-                std::string record = dbInst.get_shipment(document);
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Document from databse is %s\n"), record.c_str()));
-            }
-        } else {
-          /* Action based on uri in get request */
-          std::string uri(http.get_uriName());
-
-          if(!uri.compare("/api/login")) {
-            /* user is trying to log in - authenticate now */
-            auto user = http.get_element("username");
-	        auto pwd = http.get_element("password");
-
-            if(user.length() && pwd.length()) {
-              /* do an authentication with DB now */
-              std::string document = "{\"username\" : \"" + user + "\", \"password\" : \"" + pwd + "\"}";
-              std::int32_t record = dbInst.validate_user(document);
-            } 
-          }
-        }
-    }
-    #endif
 
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
@@ -258,12 +227,17 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         } 
     } else if(!uri.compare("/api/shipping")) {
         std::string collectionName("shipping");
-        std::string billTo("Z1234567");
+        auto awbNo = http.get_element("shipmentNo");
+        auto accountCode = http.get_element("accountCode");
 
-        if(1) {
+        if(awbNo.length() && accountCode.length()) {
             /* do an authentication with DB now */
-            std::string document = "{\"senderInformation.billTo\" : \"" + billTo + "\"}";
-            std::string projection("{\"_id\" : false}");
+            std::string document = "{\"billTo\" : \"" +
+                                     accountCode + "\" ," +
+                                    "\"shipmentNo\" : \"" +
+                                    awbNo + "\"" +
+                                    "}";
+           std::string projection("{\"_id\" : false}");
             std::string record = dbInst.get_shipment(collectionName, document, projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l AWB Way Bills %s\n"), record.c_str()));
             return(build_responseOK(record));
@@ -343,6 +317,24 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
 ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
 {
+    /* Check for Query string */
+    Http http(in);
+
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+    std::string ct = http.get_element("Content-Type");
+    std::string cl = http.get_element("Content-Length");
+    std::string content = http.body();
+    std::string awbNo = http.get_element("shipmentNo");
+
+    if(!uri.compare("/api/shipping")) {
+        /** Update on Shipping */
+        if(ct.length() && !ct.compare(0, 15, "application/json")) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
+            dbInst.update_shipment(awbNo, content);
+        }
+    }
+#if 0
     size_t ct_offset = 0, cl_offset = 0;
     /* Get the payload length */
     if(std::string::npos != (ct_offset = in.find("Content-Type: ", 0)) && std::string::npos != (cl_offset = in.find("Content-Length: ", 0))) {
@@ -372,7 +364,8 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
             }
         }
     }
-    return(build_responseCreated());
+#endif
+    return(build_responseOK(std::string()));
 }
 
 ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
@@ -456,13 +449,21 @@ int MicroService::open(void *arg)
 {
     /*! Number of threads are 5, which is 2nd argument. */
     activate();
+    return(0);
 }
 
 int MicroService::close(u_long flag)
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is closing\n")));
+    return(0);
 }
 
+/*
+ * @brief: This function is the entry point for Thread. Once the thread is spawned, control comes here
+ *         and It blocks on message queue. The thread is termed as Worker.
+ * @param: none
+ * @return: 
+ */
 int MicroService::svc() 
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is spawned\n")));
@@ -496,6 +497,7 @@ int MicroService::svc()
                 {
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Got MB_PCSIG \n")));
                     m_continue = false;
+                    m_mb->release();
                     msg_queue()->deactivate();
                     break;
                 }
@@ -519,21 +521,31 @@ MicroService::MicroService(ACE_Thread_Manager* thr_mgr) :
 {
     m_continue = true;
     m_mb = nullptr;
-    ACE_NEW_NORETURN(m_mb, ACE_Message_Block((size_t)MemorySize::SIZE_5KB));
+    //ACE_NEW_NORETURN(m_mb, ACE_Message_Block((size_t)MemorySize::SIZE_1MB));
     m_threadId = thr_mgr->thr_self();
 }
 
 MicroService::~MicroService()
 {
     m_mb->release();
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %t:%M %N:%l dtor is invoked\n")));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Microservice dtor is invoked\n")));
 }
+
+/*
+ * _                  _   _ _ _    _          _ _ _ _  _ _ _ _ _ _ _ _ _   _        _  _ _ _ _ _ _ _ _ 
+ * \\       /\       //  // _ \ \ ||         ||      || ||      ||      \\ \\      // ||      ||      \\
+ *  \\     //\\     //_ //_ _ _\_\||_ _ _    || _  _    ||_ _   ||      //  \\    //  ||_ _   ||      //
+ *   \\   //  \\   // -//         ||     \\          || ||      || _ //      \\  //   ||      || _ //
+ *    \\_//    \\_//   \\_ _ _ _  ||_ _ _//  || _ _ _|| ||_ _ _ ||     \\     \\//    ||_ _ _ ||     \\
+ *
+ *                
+ */
 
 
 ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
 {
 
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l WebServer::handle_timedout\n")));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebServer::handle_timedout\n")));
     std::uintptr_t handle = reinterpret_cast<std::uintptr_t>(act);
     auto conIt = m_connectionPool.find(handle);
 
@@ -560,21 +572,22 @@ ACE_INT32 WebServer::handle_input(ACE_HANDLE handle)
     if(!ret_status) {
         auto it = m_connectionPool.find(peerStream.get_handle());
         if(it != std::end(m_connectionPool)) {
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l New connection on handle %d found in connection pool\n"), peerStream.get_handle()));
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Existing connection on handle %d found in connection pool\n"), peerStream.get_handle()));
             connEnt = it->second;
         } else {
             ACE_NEW_RETURN(connEnt, WebConnection(this), -1);
             m_connectionPool[peerStream.get_handle()] = connEnt;
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l New connection is created and handle is %d\n"), peerStream.get_handle()));
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l New connection is created and handle is %d\n"), peerStream.get_handle()));
             /*! Start Handle Cleanup Timer to get rid of this handle from connectionPool*/
             long tId = start_conn_cleanup_timer(peerStream.get_handle());
             connEnt->timerId(tId);
             connEnt->handle(peerStream.get_handle());
             connEnt->connAddr(peerAddr);
-            ACE_Reactor::instance()->register_handler(connEnt, ACE_Event_Handler::READ_MASK|ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK);
+            ACE_Reactor::instance()->register_handler(connEnt, 
+                                                      ACE_Event_Handler::READ_MASK|ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK);
         }
     } else {
-        ACE_ERROR((LM_ERROR, ACE_TEXT("%D %M %t:%N:%l Accept to new connection failed\n")));
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Accept to new connection failed\n")));
     }
 
     return(0);
@@ -582,7 +595,27 @@ ACE_INT32 WebServer::handle_input(ACE_HANDLE handle)
 
 ACE_INT32 WebServer::handle_signal(int signum, siginfo_t* s, ucontext_t* ctx)
 {
-    ACE_ERROR((LM_ERROR, ACE_TEXT("%D %M %t:%N:%l Signal %d is received for WebServer\n"), signum));
+    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Signal Number %d and its name %S is received for WebServer\n"), signum, signum));
+    if(!connectionPool().empty()) {
+      for(auto it = connectionPool().begin(); it != connectionPool().end(); ++it) {
+        auto wc = it->second;
+        stop_conn_cleanup_timer(wc->timerId());
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l its name %S is received for WebServer\n"), signum));
+        delete wc;
+      }
+      connectionPool().clear();
+    }
+
+    if(!workerPool().empty()) {
+        std::for_each(workerPool().begin(), workerPool().end(), [&](MicroService* ms) {
+            ACE_Message_Block* req = nullptr;
+            ACE_NEW_RETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1KB), -1);
+            req->msg_type(ACE_Message_Block::MB_PCSIG);
+            ms->putq(req);
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Sending to Worker Node\n")));
+        });
+    }
+
     return(0);
 }
 
@@ -596,10 +629,14 @@ ACE_HANDLE WebServer::get_handle() const
     return(m_server.get_handle());
 }
 
-WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 workerPool, std::string dbUri, std::string dbConnPool, std::string dbName)
+WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 workerPool,
+                     std::string dbUri,
+                     std::string dbConnPool,
+                     std::string dbName)
 {
     std::string addr;
     addr.clear();
+
     if(ipStr.length()) {
         addr = ipStr;
         addr += ":";
@@ -615,11 +652,12 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
 
     int reuse_addr = 1;
     if(m_server.open(m_listen, reuse_addr)) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l Starting of WebServer failed - opening of port %d hostname %s\n"), m_listen.get_port_number(), m_listen.get_host_name()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Starting of WebServer failed - opening of port %d hostname %s\n"), m_listen.get_port_number(), m_listen.get_host_name()));
     }
 
     m_workerPool.clear();
     std::uint32_t cnt;
+
     for(cnt = 0; cnt < workerPool; ++cnt) {
         MicroService* worker = nullptr;
         ACE_NEW_NORETURN(worker, MicroService(ACE_Thread_Manager::instance()));
@@ -655,19 +693,33 @@ WebServer::~WebServer()
         delete mMongodbc;
         mMongodbc = nullptr;
     }
+
+    if(!workerPool().empty()) {
+        for(auto it = workerPool().begin(); it != workerPool().end(); ++it) {
+            auto ent = *it;
+            delete ent;
+        }
+    }
 }
 
 bool WebServer::start()
 {
     int ret_status = 0;
     ACE_Reactor::instance()->register_handler(this, ACE_Event_Handler::ACCEPT_MASK | ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK); 
+    /* subscribe for signal */
+    ACE_Sig_Set ss;
+    ss.empty_set();
+    ss.sig_add(SIGINT);
+    ss.sig_add(SIGTERM);
+    ACE_Reactor::instance()->register_handler(&ss, this); 
 
     ACE_Time_Value to(1,0);
 
     while(!m_stopMe) {
         ACE_Reactor::instance()->handle_events(to);
     }
-    return(true);
+
+    return(m_stopMe);
 }
 
 bool WebServer::stop()
@@ -680,24 +732,25 @@ long WebServer::start_conn_cleanup_timer(ACE_HANDLE handle)
     long timerId = -1;
     ACE_Time_Value to(20,0);
     timerId = ACE_Reactor::instance()->schedule_timer(this, (const void *)handle, to);
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l webserver cleanup timer is started for handle %d\n"), handle));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l webserver cleanup timer is started for handle %d\n"), handle));
     return(timerId);
 }
 
 void WebServer::stop_conn_cleanup_timer(long timerId) 
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l webserver connection cleanup timer is stopped\n")));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l webserver connection cleanup timer is stopped\n")));
     ACE_Reactor::instance()->cancel_timer(timerId);
 }
 void WebServer::restart_conn_cleanup_timer(ACE_HANDLE handle)
 {
-    ACE_Time_Value to(5,0);
+    ACE_Time_Value to(20,0);
     auto conIt = connectionPool().find(handle);
 
     if(conIt != std::end(connectionPool())) {
         auto connEnt = conIt->second;
         long tId = connEnt->timerId();
         ACE_Reactor::instance()->reset_timer_interval(tId, to);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l webserver connection cleanup timer is re-started for handle %d\n"), handle));
     }
 
 }
@@ -732,7 +785,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     ACE_Message_Block* req;
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l WebConnection::handle_input\n")));
 
-    ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_10KB));
+    ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1MB));
     req->msg_type(ACE_Message_Block::MB_DATA);
     /*_ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
      | 4-bytes handle   | 4-bytes db instance pointer   | request (payload) |
@@ -747,7 +800,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 
     req->wr_ptr(sizeof(uintptr_t));
 
-    std::int32_t len = recv(handle, req->wr_ptr(), (size_t)MemorySize::SIZE_10KB, 0);
+    std::int32_t len = recv(handle, req->wr_ptr(), (size_t)MemorySize::SIZE_1MB, 0);
     if(len < 0) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D %M %t:%N:%l Receive failed for handle %d\n"), handle));
         return(len);
@@ -763,13 +816,19 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     auto it = m_parent->currentWorker();
     MicroService* mEnt = *it;
     mEnt->putq(req);
-
+    /* re-start the connection timed out timer again */
+    parent()->restart_conn_cleanup_timer(handle);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Connection timeout timer is re-started for handle %d\n"), handle));
     return(0);
 }
 
 ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l signal number - %d is received\n"), signum));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l signal number - %d (%S) is received\n"), signum));
+    if(m_timerId > 0) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l Running timer is stopped for signal (%S)\n"), signum));
+        m_parent->stop_conn_cleanup_timer(m_timerId);
+    }
     return(0);
 }
 

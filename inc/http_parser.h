@@ -34,6 +34,14 @@ class Http {
         return std::string();
     }
 
+    std::string body() {
+      return m_body;
+    }
+
+    std::string header() {
+      return m_header;
+    }
+
     void parse_uri(const std::string& in);
     void parse_mime_header(const std::string& in);
     void dump(void) const;

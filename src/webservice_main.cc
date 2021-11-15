@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
 
    int _port = 8080;
    int _worker = 10;
+   /* mongodb connection pool */
    int _pool = 50;
 
    cmdOpt.fill("");
@@ -24,13 +25,15 @@ int main(int argc, char* argv[])
 
    /* The last argument tells from where to start in argv - offset of argv array */
    ACE_Get_Opt opts (argc, argv, ACE_TEXT ("s:p:w:u:c:h:d:"), 1);
-   opts.long_option (ACE_TEXT ("server-ip"), 's', ACE_Get_Opt::ARG_REQUIRED);
-   opts.long_option (ACE_TEXT ("server-port"), 'p', ACE_Get_Opt::ARG_REQUIRED);
-   opts.long_option (ACE_TEXT ("server-worker"), 'w', ACE_Get_Opt::ARG_REQUIRED);
-   opts.long_option (ACE_TEXT ("mongo-db-uri"), 'u', ACE_Get_Opt::ARG_REQUIRED);
-   opts.long_option (ACE_TEXT ("mongo-db-connection-pool"), 'c', ACE_Get_Opt::ARG_REQUIRED);
-   opts.long_option (ACE_TEXT ("mongo-db-name"), 'd', ACE_Get_Opt::ARG_REQUIRED);
-   opts.long_option (ACE_TEXT ("help"), 'h', ACE_Get_Opt::ARG_REQUIRED);
+
+   opts.long_option(ACE_TEXT("server-ip"), 's', ACE_Get_Opt::ARG_REQUIRED);
+   opts.long_option(ACE_TEXT("server-port"), 'p', ACE_Get_Opt::ARG_REQUIRED);
+   opts.long_option(ACE_TEXT("server-worker"), 'w', ACE_Get_Opt::ARG_REQUIRED);
+   opts.long_option(ACE_TEXT("mongo-db-uri"), 'u', ACE_Get_Opt::ARG_REQUIRED);
+   opts.long_option(ACE_TEXT("mongo-db-connection-pool"), 'c', ACE_Get_Opt::ARG_REQUIRED);
+   opts.long_option(ACE_TEXT("mongo-db-name"), 'd', ACE_Get_Opt::ARG_REQUIRED);
+   opts.long_option(ACE_TEXT("help"), 'h', ACE_Get_Opt::ARG_REQUIRED);
+
    int c = 0;
 
    while ((c = opts ()) != EOF) {
@@ -39,15 +42,6 @@ int main(int argc, char* argv[])
        {
          cmdOpt[std::size_t(CommandArgumentName::SERVER_IP)] = std::string(opts.opt_arg());
          ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l IP %s\n"), std::get<std::size_t(CommandArgumentName::SERVER_IP)>(cmdOpt).c_str()));
-         #if 0
-         if(!i) {
-           ACE_ERROR((LM_ERROR, ACE_TEXT("%D [master:%t] %M %N:%l IP value is zero\n")));
-         } else {
-           std::string tmp(i);
-           ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l IP %s\n"), tmp.c_str()));
-           ip.assign(i);
-         }
-         #endif
        }
          break;
 
@@ -99,22 +93,25 @@ int main(int argc, char* argv[])
 
    if(std::get<std::size_t(CommandArgumentName::SERVER_PORT)>(cmdOpt).length()) {
      _port = std::stoi(std::get<std::size_t(CommandArgumentName::SERVER_PORT)>(cmdOpt));
-     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l port %d\n"), _port));
+     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l listening port %d\n"), _port));
 
    }
 
    if(std::get<std::size_t(CommandArgumentName::SERVER_WORKER_NODE)>(cmdOpt).length()) {
      _worker = std::stoi(std::get<std::size_t(CommandArgumentName::SERVER_WORKER_NODE)>(cmdOpt));
-     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l the number of worker is %d\n"), _worker));
+     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l the number of worker node is %d\n"), _worker));
    }
    
    if(std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt).length()) {
      _pool = std::stoi(std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt));
-     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l the db connection pool is %d\n"), _pool));
+     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l the mongodb connection pool is %d\n"), _pool));
    } 
 
-   WebServer inst(std::get<std::size_t(CommandArgumentName::SERVER_IP)>(cmdOpt), _port, _worker, std::get<std::size_t(CommandArgumentName::DB_URI)>(cmdOpt),
-                  std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt), std::get<std::size_t(CommandArgumentName::DB_NAME)>(cmdOpt));
+   WebServer inst(std::get<std::size_t(CommandArgumentName::SERVER_IP)>(cmdOpt),
+                  _port, _worker, 
+                  std::get<std::size_t(CommandArgumentName::DB_URI)>(cmdOpt),
+                  std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt),
+                  std::get<std::size_t(CommandArgumentName::DB_NAME)>(cmdOpt));
    inst.start();
 
    return(0);
