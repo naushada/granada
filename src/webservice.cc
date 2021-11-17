@@ -252,7 +252,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         if(found != std::string::npos) {
           ext = uri.substr((found + 1), (uri.length() - found));
           fileName = uri.substr(6, (uri.length() - 6));
-          std::string newFile = "../webgui/sw/" + fileName;
+          std::string newFile = "../webgui/ui/" + fileName;
           ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s The extension is %s\n"), newFile.c_str(), ext.c_str()));
           /* Open the index.html file and send it to web browser. */
           std::ifstream ifs(newFile.c_str());
@@ -276,7 +276,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         std::size_t found = uri.find_last_of(".");
         if(found != std::string::npos) {
           ext = uri.substr((found + 1), (uri.length() - found));
-          std::string newFile = "../webgui/sw" + uri;
+          std::string newFile = "../webgui/ui" + uri;
           ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s The extension is %s\n"), newFile.c_str(), ext.c_str()));
           /* Open the index.html file and send it to web browser. */
           std::ifstream ifs(newFile.c_str(), ios::binary);
@@ -294,7 +294,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
           }
         }
     } else if(!uri.compare(0, 1, "/")) {
-        std::string newFile = "../webgui/sw/index.html";
+        std::string newFile = "../webgui/ui/index.html";
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s \n"), newFile.c_str()));
         /* Open the index.html file and send it to web browser. */
         std::ifstream ifs(newFile.c_str(), ios::binary);
@@ -397,6 +397,7 @@ ACE_Message_Block* MicroService::build_responseCreated()
 
     http_header = "HTTP/1.1 201 Created\r\n";
     http_header += "Connection: keep-alive\r\n";
+    http_header += "Access-Control-Allow-Origin: *\r\n";
     http_header += "Content-Length: 0\r\n";
 
     ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
@@ -415,6 +416,7 @@ ACE_Message_Block* MicroService::build_responseOK(std::string httpBody, std::str
 
     http_header = "HTTP/1.1 200 OK\r\n";
     http_header += "Connection: keep-alive\r\n";
+    http_header += "Access-Control-Allow-Origin: *\r\n";
 
     if(httpBody.length()) {
         http_header += "Content-Length: " + std::to_string(httpBody.length()) + "\r\n";
