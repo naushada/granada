@@ -235,7 +235,6 @@ std::string Http::get_body(const std::string& in)
   std::string contentLen = get_element("Content-Length");
   std::string ty("application/json");
 
-  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is %s and CL %d payload length %d\n"), ct.c_str(),std::stoi(contentLen), in.length()));
   if(!ct.compare("application/json")) {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json CL %d\n"), std::stoi(contentLen)));
     std::uint32_t offset = in.length() - std::stoi(contentLen);
