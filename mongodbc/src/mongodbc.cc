@@ -49,8 +49,10 @@ Mongodbc::Mongodbc(std::string uri_str, std::string db_name, std::uint32_t poolS
             /* pool of connections*/
             std::string poolUri(uri_str);
             /* reference: http://mongocxx.org/mongocxx-v3/connection-pools/ */
-            poolUri += "/?minPoolSize=10&maxPoolSize=" + std::to_string(poolSize);
+            //poolUri += "/?minPoolSize=10&maxPoolSize=" + std::to_string(poolSize);
+            poolUri += "&minPoolSize=10&maxPoolSize=" + std::to_string(poolSize);
             mongocxx::uri uri(poolUri.c_str());
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l The URI is %s\n"), poolUri.c_str()));
             mMongoConnPool = new mongocxx::pool(uri);
 
             if(nullptr == mMongoConnPool) {
