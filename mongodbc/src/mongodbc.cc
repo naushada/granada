@@ -109,6 +109,9 @@ bool Mongodbc::create_shipment(std::string shipmentRecord)
         mongocxx::database dbInst = conn->database(get_dbName().c_str());
         auto collection = dbInst.collection("shipping");
         bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(new_shipment.view());
+        bsoncxx::oid oid = result->inserted_id().get_oid().value;
+        std::string JobID = oid.to_string();
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid is %s\n"), JobID.c_str()));
     }
 
     return(true);
@@ -194,4 +197,20 @@ std::string Mongodbc::validate_user(std::string collectionName, std::string quer
 
     return(std::string(bsoncxx::to_json(res).c_str()));
 }
+
+std::string Mongodbc::create_account(std::string accountRecord)
+{
+    bsoncxx::document::value new_account = bsoncxx::from_json(accountRecord.c_str());
+    
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection("account");
+    bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(new_account.view());
+    bsoncxx::oid oid = result->inserted_id().get_oid().value;
+    std::string JobID = oid.to_string();
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid is %s\n"), JobID.c_str()));
+
+    return(std::string());
+}
+
 #endif /* __mongodbc_cc__*/

@@ -194,8 +194,15 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
         std::string content = http.body();
         if(content.length()) {
             bool record = dbInst.create_shipment(content);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document->\n %s\n"), content.c_str()));
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for shipping ->\n %s\n"), content.c_str()));
         } 
+    } else if(!uri.compare("/api/account")) {
+        std::string collectionName("account");
+        std::string content = http.body();
+        if(content.length()) {
+            std::string record = dbInst.create_account(content);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for account ->\n %s\n"), content.c_str()));
+        }
     }
     return(build_responseOK(std::string()));
 }
@@ -225,6 +232,8 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l User or Customer details %s\n"), record.c_str()));
             return(build_responseOK(record));
         } 
+    } else if(!uri.compare("/api/account")) {
+
     } else if(!uri.compare("/api/shipping")) {
         std::string collectionName("shipping");
         auto awbNo = http.get_element("shipmentNo");
@@ -293,6 +302,25 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
               return(build_responseOK(_str.str(), cntType));
           }
         }
+
+    } else if((!uri.compare(0, 6, "/bayt/"))) {
+        std::string newFile = "../webgui/ui/index.html";
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s \n"), newFile.c_str()));
+        /* Open the index.html file and send it to web browser. */
+        std::ifstream ifs(newFile.c_str(), ios::binary);
+        std::stringstream _str("");
+        std::string cntType("");
+
+        if(ifs.is_open()) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Request file %s - open successfully.\n"), uri.c_str()));
+
+            cntType = "text/html";
+            _str << ifs.rdbuf();
+            ifs.close();
+
+            return(build_responseOK(_str.str(), cntType));
+        }
+
     } else if(!uri.compare(0, 1, "/")) {
         std::string newFile = "../webgui/ui/index.html";
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s \n"), newFile.c_str()));
