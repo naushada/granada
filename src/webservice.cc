@@ -218,16 +218,19 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l API Name %s\n"), uri.c_str()));
     if(!uri.compare("/api/login")) {
-        std::string collectionName("login");
+        std::string collectionName("account");
 
         /* user is trying to log in - authenticate now */
-        auto user = http.get_element("username");
+        auto user = http.get_element("userId");
 	    auto pwd = http.get_element("password");
 
         if(user.length() && pwd.length()) {
             /* do an authentication with DB now */
-            std::string document = "{\"username\" : \"" + user + "\"}";
-            std::string projection("{\"username\" : true, \"_id\" : false}");
+            std::string document = "{\"accountCode\" : \"" +  user + "\", " + 
+                                   "\"accountPassword\" : \"" + pwd + "\"" + 
+                                    "}";
+            //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
+            std::string projection("{\"_id\" : false}");
             std::string record = dbInst.validate_user(collectionName, document, projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l User or Customer details %s\n"), record.c_str()));
             return(build_responseOK(record));
@@ -241,7 +244,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
         if(awbNo.length() && accountCode.length()) {
             /* do an authentication with DB now */
-            std::string document = "{\"billTo\" : \"" +
+            std::string document = "{\"accountCode\" : \"" +
                                      accountCode + "\" ," +
                                     "\"shipmentNo\" : \"" +
                                     awbNo + "\"" +
