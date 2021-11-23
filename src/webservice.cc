@@ -236,8 +236,23 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             return(build_responseOK(record));
         } 
     } else if(!uri.compare("/api/account")) {
+        std::string collectionName("account");
 
-    } else if(!uri.compare("/api/shipping")) {
+        /* user is trying to log in - authenticate now */
+        auto user = http.get_element("accountCode");
+
+        if(user.length()) {
+            /* do an authentication with DB now */
+            std::string document = "{\"accountCode\" : \"" +  user + "\" " + 
+                                    "}";
+            //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
+            std::string projection("{\"_id\" : false}");
+            std::string record = dbInst.get_accountInfo(collectionName, document, projection);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
+            return(build_responseOK(record));
+        }
+
+    } else if(!uri.compare("/api/shipping") || (!uri.compare("/api/shipment"))) {
         std::string collectionName("shipping");
         auto awbNo = http.get_element("shipmentNo");
         auto accountCode = http.get_element("accountCode");
@@ -253,7 +268,21 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             std::string record = dbInst.get_shipment(collectionName, document, projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l AWB Way Bills %s\n"), record.c_str()));
             return(build_responseOK(record));
-        } 
+        }
+    } else if((!uri.compare("/api/altref"))) {
+        std::string collectionName("shipping");
+        auto altRefNo = http.get_element("altRefNo");
+
+        if(altRefNo.length()) {
+            /* do an authentication with DB now */
+            std::string document = "{\"altRefNo\" : \"" +
+                                     altRefNo + "\" " +
+                                    "}";
+           std::string projection("{\"_id\" : false}");
+            std::string record = dbInst.get_shipment(collectionName, document, projection);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l altRefNo Response %s\n"), record.c_str()));
+            return(build_responseOK(record));
+        }
     } else if((!uri.compare(0, 6, "/bayt/"))) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
         /* build the file name now */
@@ -353,17 +382,20 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
 
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
-    std::string ct = http.get_element("Content-Type");
-    std::string cl = http.get_element("Content-Length");
-    std::string content = http.body();
-    std::string awbNo = http.get_element("shipmentNo");
 
-    if(!uri.compare("/api/shipping")) {
+    if(!uri.compare("/api/shipment")) {
         /** Update on Shipping */
-        if(ct.length() && !ct.compare(0, 15, "application/json")) {
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
-            dbInst.update_shipment(awbNo, content);
-        }
+        std::string content = http.body();
+        std::string awbNo = http.get_element("shipmentNo");
+        std::string accountCode = http.get_element("accountCode");
+        std::string query = "{\"accountCode\" : \"" +
+                             accountCode + "\" ," +
+                             "\"shipmentNo\" : \"" +
+                             awbNo + "\"" +
+                             "}";
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating Shipment %s\n"), query.c_str()));
+        dbInst.update_shipment(query, content);
     }
 #if 0
     size_t ct_offset = 0, cl_offset = 0;

@@ -70,6 +70,7 @@ class Mongodbc {
         void dump_document(CollectionName collection);
         std::string validate_user(std::string collectionName, std::string query, std::string fieldProjection);
         std::string create_account(std::string accountRecord);
+        std::string get_accountInfo(std::string collectionName, std::string query, std::string fieldProjection);
 
     private:
         std::string mURI;

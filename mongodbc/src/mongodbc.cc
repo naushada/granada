@@ -131,7 +131,8 @@ bool Mongodbc::update_shipment(std::string match, std::string shippingRecord)
         mongocxx::database dbInst = conn->database(get_dbName().c_str());
         auto collection = dbInst.collection("shipping");
         //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
-        bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), {$set:toUpdate.view()});
+        bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_one(filter.view(), {$push:toUpdate.view()});
+        //bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(shippingRecord.view());
     }
     #if 0
     bsoncxx::document::value new_shipment = bsoncxx::from_json(shippingRecord.c_str());
@@ -196,6 +197,11 @@ std::string Mongodbc::validate_user(std::string collectionName, std::string quer
     }
 
     return(std::string(bsoncxx::to_json(res).c_str()));
+}
+
+std::string Mongodbc::get_accountInfo(std::string collectionName, std::string query, std::string fieldProjection)
+{
+    return(validate_user(collectionName, query, fieldProjection));
 }
 
 std::string Mongodbc::create_account(std::string accountRecord)
