@@ -1,6 +1,9 @@
 #ifndef __mongodbc_cc__
 #define __mongodbc_cc__
 
+#include <vector>
+#include <sstream>
+
 #include "mongodbc.h"
 
 Mongodbc::Mongodbc()
@@ -149,6 +152,7 @@ bool Mongodbc::delete_shipment(std::string shippingRecord)
 {
     return(true);
 }
+
 std::string Mongodbc::get_shipment(std::string collectionName, std::string query, std::string fieldProjection)
 {
     std::string json_object;
@@ -168,6 +172,46 @@ std::string Mongodbc::get_shipment(std::string collectionName, std::string query
     }
 
     return(std::string(bsoncxx::to_json(res).c_str()));
+
+    #if 0
+    //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
+    bsoncxx::stdx::optional<mongocxx::cursor> result = collection.find(filter.view());
+    bsoncxx::document::value what = bsoncxx::from_json(key.c_str());
+    json_object.clear();
+    bsoncxx::stdx::optional<bsoncxx::document::value> result = get_collection(CollectionName::SHIPPING).find_one(what);
+    json_object =  bsoncxx::to_json(result.view());
+    #endif
+}
+
+std::string Mongodbc::get_shipmentList(std::string collectionName, std::string query, std::string fieldProjection)
+{
+    std::string json_object;
+    bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection(collectionName.c_str());
+
+    mongocxx::options::find opts{};
+    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
+    auto resultFormat = opts.projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+    bsoncxx::document::view res = *cursor.begin();
+    std::vector<bsoncxx::document::value> docArr;
+    std::stringstream result("");
+    result << "[";
+    docArr.clear();
+    auto array_builder = bsoncxx::builder::basic::array{};
+    for (auto&& doc : cursor) {
+        docArr.emplace_back(doc);
+        array_builder.append(doc);
+        //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Shipment List %s\n"), bsoncxx::to_json(doc).c_str()));
+        result << bsoncxx::to_json(doc).c_str()
+               << ",";
+    }
+    result.seekp(-1, std::ios_base::end);
+    result << "]";
+
+    return(std::string(result.str()));
 
     #if 0
     //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());

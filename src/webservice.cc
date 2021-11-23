@@ -269,7 +269,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l AWB Way Bills %s\n"), record.c_str()));
             return(build_responseOK(record));
         }
-    } else if((!uri.compare("/api/altref"))) {
+    } else if((!uri.compare("/api/altrefno"))) {
         std::string collectionName("shipping");
         auto altRefNo = http.get_element("altRefNo");
 
@@ -281,6 +281,35 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
            std::string projection("{\"_id\" : false}");
             std::string record = dbInst.get_shipment(collectionName, document, projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l altRefNo Response %s\n"), record.c_str()));
+            return(build_responseOK(record));
+        }
+    } else if((!uri.compare("/api/awbno"))) {
+        std::string collectionName("shipping");
+        auto awbNo = http.get_element("shipmentNo");
+
+        if(awbNo.length()) {
+            /* do an authentication with DB now */
+            std::string document = "{\"shipmentNo\" : \"" +
+                                     awbNo + "\" " +
+                                    "}";
+           std::string projection("{\"_id\" : false}");
+            std::string record = dbInst.get_shipment(collectionName, document, projection);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
+            return(build_responseOK(record));
+        }
+    } else if((!uri.compare("/api/shipmentlist"))) {
+        std::string collectionName("shipping");
+        auto fromDate = http.get_element("fromDate");
+        auto toDate = http.get_element("toDate");
+
+        if(fromDate.length() && toDate.length()) {
+            /* do an authentication with DB now */
+            std::string document = "{\"createdOn\" : {\"$lte\": \""  + fromDate + "\"" + 
+                                   ", \"$gte\": \"" + toDate + "\"" + "}}";
+
+            std::string projection("{\"_id\" : false}");
+            std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
             return(build_responseOK(record));
         }
     } else if((!uri.compare(0, 6, "/bayt/"))) {
