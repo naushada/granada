@@ -315,31 +315,61 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
     } else if((!uri.compare("/api/altrefno"))) {
         std::string collectionName("shipping");
         auto altRefNo = http.get_element("altRefNo");
+        auto accCode = http.get_element("accountCode");
+        std::string document("");
 
-        if(altRefNo.length()) {
+        if(altRefNo.length() && accCode.length()) {
             /* do an authentication with DB now */
-            std::string document = "{\"altRefNo\" : \"" +
-                                     altRefNo + "\" " +
-                                    "}";
-           std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.get_shipment(collectionName, document, projection);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l altRefNo Response %s\n"), record.c_str()));
-            return(build_responseOK(record));
+            document = "{\"altRefNo\" : \"" +
+                        altRefNo + "\", \"accountCode\" :\"" +
+                        altRefNo + "\" " +
+                        "}";
+        } else {
+            document = "{\"altRefNo\" : \"" +
+                        altRefNo + "\" " +
+                        "}";
+
         }
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_shipment(collectionName, document, projection);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l altRefNo Response %s\n"), record.c_str()));
+        if(record.length()) {
+            return(build_responseOK(record));
+        } else {
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid ALT REF No.\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+        }
+
     } else if((!uri.compare("/api/awbno"))) {
         std::string collectionName("shipping");
         auto awbNo = http.get_element("shipmentNo");
+        auto accCode = http.get_element("accountCode");
+        std::string document("");
 
-        if(awbNo.length()) {
+        if(awbNo.length() && accCode.length()) {
             /* do an authentication with DB now */
-            std::string document = "{\"shipmentNo\" : \"" +
-                                     awbNo + "\" " +
-                                    "}";
-           std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.get_shipment(collectionName, document, projection);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
-            return(build_responseOK(record));
+            document = "{\"shipmentNo\" : \"" +
+                        awbNo + "\",\"accountCode\": \"" +
+                        accCode + "\" " +
+                        "}";
+        } else {
+            document = "{\"shipmentNo\" : \"" +
+                        awbNo + "\" " +
+                        "}";
         }
+
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_shipment(collectionName, document, projection);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
+        if(record.length()) {
+            return(build_responseOK(record));
+        } else {
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+        }
+
     } else if((!uri.compare("/api/shipmentlist"))) {
         std::string collectionName("shipping");
         auto fromDate = http.get_element("fromDate");
