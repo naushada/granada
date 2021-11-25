@@ -374,25 +374,35 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         std::string collectionName("shipping");
         auto fromDate = http.get_element("fromDate");
         auto toDate = http.get_element("toDate");
+        auto accCode = http.get_element("accountCode");
+        std::string document("");
 
-        if(fromDate.length() && toDate.length()) {
+        if(fromDate.length() && toDate.length() && accCode.length()) {
             /* do an authentication with DB now */
-            std::string document = "{\"createdOn\" : {\"$gte\": \""  + fromDate + "\"" + 
-                                   ", \"$lte\": \"" + toDate + "\"" + "}}";
+            document = "{\"$and\": [{\"accountCode\": \"" + accCode + "\"}, {\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+                        "\"$lte\": \"" + toDate + "\"}}]}";
 
-            std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.get_shipmentList(collectionName, document, projection);
-            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l shipmentList Response %s\n"), record.c_str()));
-            if(record.length()) {
-                return(build_responseOK(record));
-            } else {
-                /* No Customer Account is found */
-                std::string err("404 Not Found");
-                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"There\'s no Accountrecord\", \"error\" : 404}");
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l No Record is found \n")));
-                return(build_responseERROR(err_message, err));
-            }
+        } else {
+            /* do an authentication with DB now */
+            document = "{\"createdOn\" : {\"$gte\": \""  + fromDate + "\"" + 
+                        ", \"$lte\": \"" + toDate + "\"" + "}}";
         }
+
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l shipmentList Query %s\n"), document.c_str()));
+
+        if(record.length()) {
+            return(build_responseOK(record));
+
+        } else {
+            /* No Customer Account is found */
+            std::string err("404 Not Found");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"There\'s no Accountrecord\", \"error\" : 404}");
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l No Record is found \n")));
+            return(build_responseERROR(err_message, err));
+        }
+
     } else if((!uri.compare(0, 6, "/bayt/"))) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
         /* build the file name now */
