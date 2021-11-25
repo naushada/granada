@@ -63,15 +63,17 @@ class Mongodbc {
             return(mMongoCollections[static_cast<size_t>(tableName)]);
         }
 
-        bool create_shipment(std::string shippingRecord);
+        std::string create_shipment(std::string shippingRecord, std::string projection);
         bool update_shipment(std::string match, std::string shippingRecord);
         bool delete_shipment(std::string shippingRecord);
         std::string get_shipment(std::string collectionName, std::string key, std::string fieldProjection);
         void dump_document(CollectionName collection);
         std::string validate_user(std::string collectionName, std::string query, std::string fieldProjection);
-        std::string create_account(std::string accountRecord);
+        std::string create_account(std::string accountRecord, std::string projection);
         std::string get_accountInfo(std::string collectionName, std::string query, std::string fieldProjection);
         std::string get_shipmentList(std::string collectionName, std::string query, std::string fieldProjection);
+        std::string get_byOID(std::string collection, std::string projection, std::string oid);
+        std::string get_documentList(std::string collectionName, std::string query, std::string fieldProjection);
 
     private:
         std::string mURI;

@@ -26,6 +26,7 @@ Mongodbc::Mongodbc(std::string uri_str, std::string db_name, std::uint32_t poolS
     mInstance = new mongocxx::instance();
     do {
         if(nullptr == mInstance) {
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l instantiation of mongocxx::instance is failed\n")));
             break;
         }
 
@@ -100,7 +101,7 @@ void Mongodbc::dump_document(CollectionName collection)
 
 }
 
-bool Mongodbc::create_shipment(std::string shipmentRecord)
+std::string Mongodbc::create_shipment(std::string shipmentRecord, std::string projection)
 {
     bsoncxx::document::value new_shipment = bsoncxx::from_json(shipmentRecord.c_str());
     if(nullptr != mMongoConn) {
@@ -115,16 +116,39 @@ bool Mongodbc::create_shipment(std::string shipmentRecord)
         bsoncxx::oid oid = result->inserted_id().get_oid().value;
         std::string JobID = oid.to_string();
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid is %s\n"), JobID.c_str()));
+        return(JobID);
+
+        /* Get the newly added shipmentNo */
+#if 0
+        std::string query("{\"_id\" : {\"$oid\": \"");
+            query += JobID + "\"}}";
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The query is %s\n"), query.c_str()));
+
+        bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
+        mongocxx::options::find opts{};
+        bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(projection.c_str());
+        auto resultFormat = opts.projection(outputProjection);
+        mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+        mongocxx::cursor::iterator iter = cursor.begin();
+        bsoncxx::document::view res = *cursor.begin();
+
+        if(iter == cursor.end()) {
+            return(std::string());
+        }
+
+        std::stringstream rsp("");
+        rsp << "{" << bsoncxx::to_json(*iter) << "}";
+        return(rsp.str());
+#endif
     }
 
-    return(true);
+    return(std::string());
 }
 
 bool Mongodbc::update_shipment(std::string match, std::string shippingRecord)
 {
     bsoncxx::document::value toUpdate = bsoncxx::from_json(shippingRecord.c_str());
     bsoncxx::document::value filter = bsoncxx::from_json(match.c_str());
-
     if(nullptr != mMongoConn) {
         mMutex.lock();
         //bsoncxx::stdx::optional<mongocxx::result::insert_one> result = get_collection(CollectionName::SHIPPING).insert_one(new_shipment.view());
@@ -134,7 +158,8 @@ bool Mongodbc::update_shipment(std::string match, std::string shippingRecord)
         mongocxx::database dbInst = conn->database(get_dbName().c_str());
         auto collection = dbInst.collection("shipping");
         //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
-        bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_one(filter.view(), {$push:toUpdate.view()});
+
+        bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_one(filter.view(), toUpdate.view());
         //bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(shippingRecord.view());
     }
     #if 0
@@ -195,15 +220,147 @@ std::string Mongodbc::get_shipmentList(std::string collectionName, std::string q
     bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
     auto resultFormat = opts.projection(outputProjection);
     mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
-    bsoncxx::document::view res = *cursor.begin();
-    std::vector<bsoncxx::document::value> docArr;
+    mongocxx::cursor::iterator iter = cursor.begin();
+
+    if(iter == cursor.end()) {
+        return(std::string());
+    }
+
     std::stringstream result("");
     result << "[";
-    docArr.clear();
-    auto array_builder = bsoncxx::builder::basic::array{};
+
+    for(; iter != cursor.end(); ++iter) {
+        result << bsoncxx::to_json(*iter).c_str()
+               << ",";
+    }
+
+    result.seekp(-1, std::ios_base::end);
+    result << "]";
+
+    return(std::string(result.str()));
+}
+
+std::string Mongodbc::validate_user(std::string collectionName, std::string query, std::string fieldProjection)
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Query %s\n"), query.c_str()));
+    bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection(collectionName.c_str());
+    mongocxx::options::find opts{};
+    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
+    auto resultFormat = opts.projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+    mongocxx::cursor::iterator iter = cursor.begin();
+    bsoncxx::document::view res = *cursor.begin();
+
+    if(iter == cursor.end()) {
+        return(std::string());
+    }
+
     for (auto&& doc : cursor) {
-        docArr.emplace_back(doc);
-        array_builder.append(doc);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l validate_user DB Result %s\n"), bsoncxx::to_json(doc).c_str()));
+    }
+
+    //return(std::string(bsoncxx::to_json(res).c_str()));
+    return(std::string(bsoncxx::to_json(res).c_str()));
+}
+
+std::string Mongodbc::get_accountInfo(std::string collectionName, std::string query, std::string fieldProjection)
+{
+    return(validate_user(collectionName, query, fieldProjection));
+}
+
+std::string Mongodbc::create_account(std::string accountRecord, std::string projection)
+{
+    bsoncxx::document::value new_account = bsoncxx::from_json(accountRecord.c_str());
+    
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection("account");
+    bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(new_account.view());
+    bsoncxx::oid oid = result->inserted_id().get_oid().value;
+    std::string JobID = oid.to_string();
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid is %s\n"), JobID.c_str()));
+    return(JobID);
+
+#if 0
+    std::string query("{\"_id\" : {\"$oid\": \"");
+    query += JobID + "\"}}";
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The query is %s\n"), query.c_str()));
+    bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
+    mongocxx::options::find opts{};
+    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(projection.c_str());
+    auto resultFormat = opts.projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), {});
+    //mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+    mongocxx::cursor::iterator iter = cursor.begin();
+    bsoncxx::document::view res = *cursor.begin();
+
+    if(iter == cursor.end()) {
+        return(std::string());
+    }
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The accountCode is %s \n"), bsoncxx::to_json(res).c_str()));
+
+    std::stringstream rsp("");
+    rsp << bsoncxx::to_json(*iter);
+    return(rsp.str());
+#endif
+}
+
+std::string Mongodbc::get_byOID(std::string coll, std::string projection, std::string oid)
+{
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection(coll.c_str());
+
+    std::string query("{\"_id\" : {\"$oid\": \"");
+    query += oid + "\"}}";
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The query is %s\n"), query.c_str()));
+    bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
+    mongocxx::options::find opts{};
+    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(projection.c_str());
+    auto resultFormat = opts.projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), {});
+    //mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+    mongocxx::cursor::iterator iter = cursor.begin();
+    bsoncxx::document::view res = *cursor.begin();
+
+    if(iter == cursor.end()) {
+        return(std::string());
+    }
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The Response is %s \n"), bsoncxx::to_json(res).c_str()));
+
+    std::stringstream rsp("");
+    rsp << bsoncxx::to_json(*iter);
+    return(rsp.str());
+
+}
+
+std::string Mongodbc::get_documentList(std::string collectionName, std::string query, std::string fieldProjection)
+{
+    std::string json_object;
+    bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection(collectionName.c_str());
+
+    mongocxx::options::find opts{};
+    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
+    auto resultFormat = opts.projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+    bsoncxx::document::view res = *cursor.begin();
+    mongocxx::cursor::iterator iter = cursor.begin();
+
+    if(iter == cursor.end()) {
+        return(std::string());
+    }
+
+    std::stringstream result("");
+    result << "[";
+
+    for (auto&& doc : cursor) {
         //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Shipment List %s\n"), bsoncxx::to_json(doc).c_str()));
         result << bsoncxx::to_json(doc).c_str()
                << ",";
@@ -221,46 +378,6 @@ std::string Mongodbc::get_shipmentList(std::string collectionName, std::string q
     bsoncxx::stdx::optional<bsoncxx::document::value> result = get_collection(CollectionName::SHIPPING).find_one(what);
     json_object =  bsoncxx::to_json(result.view());
     #endif
-}
-
-std::string Mongodbc::validate_user(std::string collectionName, std::string query, std::string fieldProjection)
-{
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Query %s\n"), query.c_str()));
-    bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
-    auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
-    auto collection = dbInst.collection(collectionName.c_str());
-    mongocxx::options::find opts{};
-    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
-    auto resultFormat = opts.projection(outputProjection);
-    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
-    bsoncxx::document::view res = *cursor.begin();
-
-    for (auto&& doc : cursor) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Result %s\n"), bsoncxx::to_json(doc).c_str()));
-    }
-
-    return(std::string(bsoncxx::to_json(res).c_str()));
-}
-
-std::string Mongodbc::get_accountInfo(std::string collectionName, std::string query, std::string fieldProjection)
-{
-    return(validate_user(collectionName, query, fieldProjection));
-}
-
-std::string Mongodbc::create_account(std::string accountRecord)
-{
-    bsoncxx::document::value new_account = bsoncxx::from_json(accountRecord.c_str());
-    
-    auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
-    auto collection = dbInst.collection("account");
-    bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(new_account.view());
-    bsoncxx::oid oid = result->inserted_id().get_oid().value;
-    std::string JobID = oid.to_string();
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid is %s\n"), JobID.c_str()));
-
-    return(std::string());
 }
 
 #endif /* __mongodbc_cc__*/

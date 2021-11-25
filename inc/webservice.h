@@ -92,6 +92,7 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
         ACE_Message_Block* build_responseOK(std::string http_body, std::string content_type="application/json");
         ACE_Message_Block* build_responseCreated();
         std::string get_contentType(std::string _ext);
+        ACE_Message_Block* build_responseERROR(std::string httpBody, std::string error);
 
     private:
         bool m_continue;

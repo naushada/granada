@@ -191,17 +191,37 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
 
     if(!uri.compare("/api/shipping")) {
         std::string collectionName("shipping");
+        /*We need newly shipment No. */
+        std::string projection("{\"_id\" : false, \"shipmentNo\" : true}");
         std::string content = http.body();
         if(content.length()) {
-            bool record = dbInst.create_shipment(content);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for shipping ->\n %s\n"), content.c_str()));
+            std::string record = dbInst.create_shipment(content, projection);
+
+            if(record.length()) {
+                std::string rsp("");
+                rsp = "{\"oid\" : \"" + record + "\"}";
+                return(build_responseOK(rsp));
+            }
+
+            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for shipping ->\n %s\n"), content.c_str()));
         } 
     } else if(!uri.compare("/api/account")) {
         std::string collectionName("account");
+        /*We need newly created account Code */
+        std::string projection("{\"_id\" : false, \"accountCode\" : true}");
         std::string content = http.body();
         if(content.length()) {
-            std::string record = dbInst.create_account(content);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for account ->\n %s\n"), content.c_str()));
+            std::string oid = dbInst.create_account(content, projection);
+
+            if(oid.length()) {
+                //std::string rsp = dbInst.get_byOID(collectionName, projection, oid);
+                std::string rsp("");
+                rsp = "{\"oid\" : \"" + oid + "\"}";
+
+                return(build_responseOK(rsp));
+            }
+
+            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for account ->\n %s\n"), content.c_str()));
         }
     }
     return(build_responseOK(std::string()));
@@ -234,7 +254,11 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             std::string record = dbInst.validate_user(collectionName, document, projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l User or Customer details %s\n"), record.c_str()));
             return(build_responseOK(record));
-        } 
+        } else {
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"User Id or Password Not provided\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+        }
     } else if(!uri.compare("/api/account")) {
         std::string collectionName("account");
 
@@ -251,6 +275,25 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
             return(build_responseOK(record));
         }
+
+    } else if(!uri.compare("/api/accountlist")) {
+        std::string collectionName("account");
+
+        /* do an authentication with DB now */
+        std::string query = "{\"role\" : \"Customer\" }";
+
+        //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
+        std::string projection("{\"_id\" : false, \"accountCode\": true}");
+        std::string record = dbInst.get_documentList(collectionName, query, projection);
+        if(!record.length()) {
+            /* No Customer Account is found */
+            std::string err("404 Not Found");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"There\'s no customer record\", \"error\" : 404}");
+            return(build_responseERROR(err_message, err));
+        }
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
+        return(build_responseOK(record));
 
     } else if(!uri.compare("/api/shipping") || (!uri.compare("/api/shipment"))) {
         std::string collectionName("shipping");
@@ -304,13 +347,21 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
         if(fromDate.length() && toDate.length()) {
             /* do an authentication with DB now */
-            std::string document = "{\"createdOn\" : {\"$lte\": \""  + fromDate + "\"" + 
-                                   ", \"$gte\": \"" + toDate + "\"" + "}}";
+            std::string document = "{\"createdOn\" : {\"$gte\": \""  + fromDate + "\"" + 
+                                   ", \"$lte\": \"" + toDate + "\"" + "}}";
 
             std::string projection("{\"_id\" : false}");
             std::string record = dbInst.get_shipmentList(collectionName, document, projection);
-            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
-            return(build_responseOK(record));
+            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l shipmentList Response %s\n"), record.c_str()));
+            if(record.length()) {
+                return(build_responseOK(record));
+            } else {
+                /* No Customer Account is found */
+                std::string err("404 Not Found");
+                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"There\'s no Accountrecord\", \"error\" : 404}");
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l No Record is found \n")));
+                return(build_responseERROR(err_message, err));
+            }
         }
     } else if((!uri.compare(0, 6, "/bayt/"))) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
@@ -416,15 +467,21 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
         /** Update on Shipping */
         std::string content = http.body();
         std::string awbNo = http.get_element("shipmentNo");
+        #if 0
         std::string accountCode = http.get_element("accountCode");
         std::string query = "{\"accountCode\" : \"" +
                              accountCode + "\" ," +
                              "\"shipmentNo\" : \"" +
                              awbNo + "\"" +
                              "}";
+        #endif
+        std::string query = "{\"shipmentNo\" : \"" +
+                             awbNo + "\"" +
+                             "}";
+        std::string document = "{\"$push\": {\"activity\" : " + content + "}}";
 
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating Shipment %s\n"), query.c_str()));
-        dbInst.update_shipment(query, content);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n"), document.c_str()));
+        dbInst.update_shipment(query, document);
     }
 #if 0
     size_t ct_offset = 0, cl_offset = 0;
@@ -507,6 +564,36 @@ ACE_Message_Block* MicroService::build_responseOK(std::string httpBody, std::str
     ACE_Message_Block* rsp = nullptr;
 
     http_header = "HTTP/1.1 200 OK\r\n";
+    http_header += "Connection: keep-alive\r\n";
+    http_header += "Access-Control-Allow-Origin: *\r\n";
+
+    if(httpBody.length()) {
+        http_header += "Content-Length: " + std::to_string(httpBody.length()) + "\r\n";
+        http_header += "Content-Type: " + contentType + "\r\n";
+        http_header += "\r\n";
+
+    } else {
+        http_header += "Content-Length: 0\r\n";
+    }
+
+    ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1KB) + httpBody.length()), nullptr);
+
+    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
+    rsp->wr_ptr(http_header.length());
+    std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
+    rsp->wr_ptr(httpBody.length());
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response header\n%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
+    return(rsp);
+}
+
+ACE_Message_Block* MicroService::build_responseERROR(std::string httpBody, std::string error)
+{
+    std::string http_header;
+    ACE_Message_Block* rsp = nullptr;
+    std::string contentType("application/json");
+
+    http_header = "HTTP/1.1 " + error + " \r\n";
     http_header += "Connection: keep-alive\r\n";
     http_header += "Access-Control-Allow-Origin: *\r\n";
 
