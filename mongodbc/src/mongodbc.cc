@@ -160,6 +160,12 @@ bool Mongodbc::update_shipment(std::string match, std::string shippingRecord)
         //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
 
         bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_one(filter.view(), toUpdate.view());
+        if(result) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The collection is updated %s\n"), shippingRecord.c_str()));
+            return(true);
+        } else {
+            return(false);
+        }
         //bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(shippingRecord.view());
     }
     #if 0
@@ -190,13 +196,20 @@ std::string Mongodbc::get_shipment(std::string collectionName, std::string query
     bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
     auto resultFormat = opts.projection(outputProjection);
     mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
-    bsoncxx::document::view res = *cursor.begin();
+    //bsoncxx::document::view res = *cursor.begin();
 
+    mongocxx::cursor::iterator iter = cursor.begin();
+
+    if(iter == cursor.end()) {
+        return(std::string());
+    }
+    /*
     for (auto&& doc : cursor) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Aero Bill %s\n"), bsoncxx::to_json(doc).c_str()));
     }
+    */
 
-    return(std::string(bsoncxx::to_json(res).c_str()));
+    return(std::string(bsoncxx::to_json(*iter).c_str()));
 
     #if 0
     //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
@@ -252,18 +265,19 @@ std::string Mongodbc::validate_user(std::string collectionName, std::string quer
     auto resultFormat = opts.projection(outputProjection);
     mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
     mongocxx::cursor::iterator iter = cursor.begin();
-    bsoncxx::document::view res = *cursor.begin();
+    //bsoncxx::document::view res = *cursor.begin();
 
     if(iter == cursor.end()) {
         return(std::string());
     }
-
+    /*
     for (auto&& doc : cursor) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l validate_user DB Result %s\n"), bsoncxx::to_json(doc).c_str()));
     }
+    */
 
     //return(std::string(bsoncxx::to_json(res).c_str()));
-    return(std::string(bsoncxx::to_json(res).c_str()));
+    return(std::string(bsoncxx::to_json(*iter).c_str()));
 }
 
 std::string Mongodbc::get_accountInfo(std::string collectionName, std::string query, std::string fieldProjection)

@@ -253,10 +253,16 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             std::string projection("{\"_id\" : false}");
             std::string record = dbInst.validate_user(collectionName, document, projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l User or Customer details %s\n"), record.c_str()));
-            return(build_responseOK(record));
+            if(!record.length()) {
+                std::string err("400 Bad Request");
+                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid Credentials\", \"errorCode\" : 404}");
+                return(build_responseERROR(err_message, err));
+            } else {
+                return(build_responseOK(record));
+            }
         } else {
             std::string err("400 Bad Request");
-            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"User Id or Password Not provided\", \"error\" : 400}");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"User Id or Password Not provided\", \"errorCode\" : 400}");
             return(build_responseERROR(err_message, err));
         }
     } else if(!uri.compare("/api/account")) {
@@ -322,7 +328,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             /* do an authentication with DB now */
             document = "{\"altRefNo\" : \"" +
                         altRefNo + "\", \"accountCode\" :\"" +
-                        altRefNo + "\" " +
+                        accCode + "\" " +
                         "}";
         } else {
             document = "{\"altRefNo\" : \"" +
@@ -521,7 +527,7 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
         std::string document = "{\"$push\": {\"activity\" : " + content + "}}";
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n"), document.c_str()));
-        dbInst.update_shipment(query, document);
+        bool rsp = dbInst.update_shipment(query, document);
     }
 #if 0
     size_t ct_offset = 0, cl_offset = 0;
