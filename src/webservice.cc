@@ -194,6 +194,7 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
         /*We need newly shipment No. */
         std::string projection("{\"_id\" : false, \"shipmentNo\" : true}");
         std::string content = http.body();
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http request body length %d \n Request Body %s\n"), content.length(), content.c_str()));
         if(content.length()) {
             std::string record = dbInst.create_shipment(content, projection);
 
@@ -210,6 +211,7 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
         /*We need newly created account Code */
         std::string projection("{\"_id\" : false, \"accountCode\" : true}");
         std::string content = http.body();
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http request body length %d \n Request Body %s\n"), content.length(), content.c_str()));
         if(content.length()) {
             std::string oid = dbInst.create_account(content, projection);
 
@@ -1010,7 +1012,34 @@ ACE_INT32 WebConnection::handle_timeout(const ACE_Time_Value &tv, const void *ac
 ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 {
     ACE_Message_Block* req;
+    std::array<std::uint8_t, 1024> scratch_pad;
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l WebConnection::handle_input\n")));
+
+    /** Peek The received request for its completeness */
+    scratch_pad.fill(0);
+    std::int32_t len = recv(handle, scratch_pad.data(), scratch_pad.size(), MSG_PEEK);
+    if(len < 0) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D %M %t:%N:%l Receive failed for handle %d\n"), handle));
+        return(len);
+    } else {
+        std::string pre_process_req((const char*)scratch_pad.data(), len);
+        Http http(pre_process_req);
+        if(http.header().length()) {
+            std::string CT = http.get_element("Content-Type");
+            std::string CL = http.get_element("Content-Length");
+            if(CT.compare("application/json")) {
+                /* This Must be POST Method. */
+                if(CT.length()) {
+                    std::int32_t expected_length = http.header().length() + std::stoi(CL);
+                    if(len != expected_length) {
+                        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l Webconnection::handle_input Partial request is received received len %d expected length %d\n"), len, expected_length));
+                        return(0);
+                    }
+                }
+            }
+        }
+    }
+
 
     ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1MB));
     req->msg_type(ACE_Message_Block::MB_DATA);
@@ -1027,7 +1056,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 
     req->wr_ptr(sizeof(uintptr_t));
 
-    std::int32_t len = recv(handle, req->wr_ptr(), (size_t)MemorySize::SIZE_1MB, 0);
+    len = recv(handle, req->wr_ptr(), (size_t)MemorySize::SIZE_1MB, 0);
     if(len < 0) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D %M %t:%N:%l Receive failed for handle %d\n"), handle));
         return(len);
