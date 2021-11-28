@@ -214,10 +214,10 @@ void Http::dump(void) const
 std::string Http::get_header(const std::string& in)
 {
 
-  if(!in.compare("application/json")) {
+  if(std::string::npos != in.find("Content-Type: application/json")) {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
     std::string body_delimeter("\r\n\r\n");
-    size_t body_offset = in.find(body_delimeter, 0);
+    size_t body_offset = in.find(body_delimeter.c_str(), 0, body_delimeter.length());
     if(std::string::npos != body_offset) {
       body_offset += body_delimeter.length();
       std::string document = in.substr(0, body_offset);
@@ -233,13 +233,24 @@ std::string Http::get_body(const std::string& in)
 {
   std::string ct = get_element("Content-Type");
   std::string contentLen = get_element("Content-Length");
+  std::string body_delimeter("\r\n\r\n");
   std::string ty("application/json");
 
-  if(!ct.compare("application/json")) {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json CL %d\n"), std::stoi(contentLen)));
-    std::uint32_t offset = in.length() - std::stoi(contentLen);
-    std::string document = in.substr(offset, std::stoi(contentLen));
-    return(document);
+  if(ct.length() && !ct.compare("application/json")) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json CL %d hdrlen %d\n"), std::stoi(contentLen), header().length()));
+
+    size_t body_offset = in.find(body_delimeter.c_str(), 0, body_delimeter.length());
+
+    if(std::string::npos != body_offset) {
+      std::string bdy(in.substr((body_delimeter.length() + body_offset), std::stoi(contentLen)));
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Bodylen is %d The BODY is \n%s\n"), bdy.length(), bdy.c_str()));
+
+      if(contentLen.length() && (in.length() == header().length() + std::stoi(contentLen))) {
+        return(bdy);
+      }
+    }
+
+    return(std::string());
 
     #if 0
     std::string body_delimeter("\r\n\r\n");

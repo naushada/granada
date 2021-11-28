@@ -716,7 +716,7 @@ int MicroService::svc()
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s dbName %s\n"), dbInst->get_uri().c_str(), dbInst->get_dbName().c_str()));
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, m_mb->length()));
 
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq\n %s"), m_mb->rd_ptr()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq\n %s\n"), m_mb->rd_ptr()));
                 /*! Process The Request */
                 process_request(handle, *m_mb, *dbInst);
                 m_mb->release();
@@ -1024,16 +1024,25 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     } else {
         std::string pre_process_req((const char*)scratch_pad.data(), len);
         Http http(pre_process_req);
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l HTTP HEADER %s\n"), http.header().c_str()));
         if(http.header().length()) {
             std::string CT = http.get_element("Content-Type");
             std::string CL = http.get_element("Content-Length");
-            if(CT.compare("application/json")) {
-                /* This Must be POST Method. */
-                if(CT.length()) {
+            if(CT.length() && !CT.compare("application/json")) {
+                /* This Must be POST or PUT Method. */
+                if(CL.length()) {
                     std::int32_t expected_length = http.header().length() + std::stoi(CL);
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l Expected Length %d received length %d\n"), expected_length, len));
+
+                    ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)(expected_length + 512)));
+                    len = recv(handle, req->wr_ptr(), (expected_length+ 512), MSG_PEEK);
                     if(len != expected_length) {
                         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l Webconnection::handle_input Partial request is received received len %d expected length %d\n"), len, expected_length));
+                        req->release();
                         return(0);
+                    } else {
+                        req->release();
                     }
                 }
             }
@@ -1041,7 +1050,8 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     }
 
 
-    ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1MB));
+    ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)(len + 512)));
+    //ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1MB));
     req->msg_type(ACE_Message_Block::MB_DATA);
     /*_ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
      | 4-bytes handle   | 4-bytes db instance pointer   | request (payload) |
@@ -1056,7 +1066,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 
     req->wr_ptr(sizeof(uintptr_t));
 
-    len = recv(handle, req->wr_ptr(), (size_t)MemorySize::SIZE_1MB, 0);
+    len = recv(handle, req->wr_ptr(), (len + 512), 0);
     if(len < 0) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D %M %t:%N:%l Receive failed for handle %d\n"), handle));
         return(len);
