@@ -243,7 +243,7 @@ std::string Http::get_body(const std::string& in)
 
     if(std::string::npos != body_offset) {
       std::string bdy(in.substr((body_delimeter.length() + body_offset), std::stoi(contentLen)));
-      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Bodylen is %d The BODY is \n%s\n"), bdy.length(), bdy.c_str()));
+      //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Bodylen is %d The BODY is \n%s\n"), bdy.length(), bdy.c_str()));
 
       if(contentLen.length() && (in.length() == header().length() + std::stoi(contentLen))) {
         return(bdy);

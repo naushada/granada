@@ -225,6 +225,45 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
 
             //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for account ->\n %s\n"), content.c_str()));
         }
+    } else if(!uri.compare("/api/bulk/shipping")) {
+        std::string content = http.body();
+        if(content.length()) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
+            std::int32_t cnt = dbInst.create_bulk_shipment(content);
+
+            if(cnt) {
+                std::string rec = "{\"createdShipments\": " + std::to_string(cnt) + "}";
+                return(build_responseOK(rec));
+            } else {
+                std::string err("400 Bad Request");
+                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Bulk Shipment Creation is failed\", \"errorCode\" : 400}");
+                return(build_responseERROR(err_message, err));
+            }
+        }
+    } else if(!uri.compare("/api/account")) {
+        std::string collectionName("account");
+
+        /* user is trying to log in - authenticate now */
+        auto user = http.get_element("accountCode");
+
+        if(user.length()) {
+            /* do an authentication with DB now */
+            std::string document = "{\"accountCode\" : \"" +  user + "\" " + 
+                                    "}";
+            //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
+            std::string projection("{\"_id\" : false}");
+            std::string record = dbInst.get_accountInfo(collectionName, document, projection);
+            if(record.length()) {
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
+                return(build_responseOK(record));
+            } else {
+                std::string err("400 Bad Request");
+                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid Account Code\", \"errorCode\" : 400}");
+
+            }
+
+            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for shipping ->\n %s\n"), content.c_str()));
+        }
     }
     return(build_responseOK(std::string()));
 }
@@ -280,8 +319,14 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
             std::string projection("{\"_id\" : false}");
             std::string record = dbInst.get_accountInfo(collectionName, document, projection);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
-            return(build_responseOK(record));
+            if(record.length()) {
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
+                return(build_responseOK(record));
+            } else {
+                std::string err("400 Bad Request");
+                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid Account Code\", \"errorCode\" : 400}");
+                return(build_responseERROR(err_message, err));
+            }
         }
 
     } else if(!uri.compare("/api/accountlist")) {
@@ -716,7 +761,7 @@ int MicroService::svc()
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s dbName %s\n"), dbInst->get_uri().c_str(), dbInst->get_dbName().c_str()));
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, m_mb->length()));
 
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq\n %s\n"), m_mb->rd_ptr()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), m_mb->length()));
                 /*! Process The Request */
                 process_request(handle, *m_mb, *dbInst);
                 m_mb->release();

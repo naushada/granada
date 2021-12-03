@@ -394,4 +394,43 @@ std::string Mongodbc::get_documentList(std::string collectionName, std::string q
     #endif
 }
 
+std::int32_t Mongodbc::create_bulk_shipment(std::string bulkShipment)
+{
+    mongocxx::options::bulk_write bulk_opt;
+    mongocxx::write_concern wc;
+    bulk_opt.ordered(false);
+    wc.acknowledge_level(mongocxx::write_concern::level::k_default);
+    bulk_opt.write_concern(wc);
+
+    bsoncxx::document::value new_shipment = bsoncxx::from_json(bulkShipment.c_str());
+    auto conn = mMongoConnPool->acquire();
+    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    auto collection = dbInst.collection("shipping");
+
+    auto bulk = collection.create_bulk_write(bulk_opt);
+
+    bsoncxx::document::view dock_view = new_shipment.view();
+    auto iter = dock_view.begin();
+    
+    //bsoncxx::document::element uid = dock_view["0"];
+    //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Bulk-Shipment\n")));
+    //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Bulk-Shipment %s\n"), bsoncxx::to_json(uid.get_document().value).c_str()));
+
+    for(; iter != dock_view.end(); ++iter) {
+        bsoncxx::document::element elm = *iter;
+        //bsoncxx::document::view elm_view = elm.get_document().value;
+        mongocxx::model::insert_one insert_op(elm.get_document().value);
+        bulk.append(insert_op);
+    }
+
+    auto result = bulk.execute();
+    std::int32_t cnt = 0;
+
+    if(result) {
+        cnt = result->inserted_count();
+    }
+
+    return(cnt);
+}
+
 #endif /* __mongodbc_cc__*/

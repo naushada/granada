@@ -7,6 +7,7 @@
 #include <mutex>
 
 #include <bsoncxx/json.hpp>
+#include <bsoncxx/types.hpp>
 #include <mongocxx/pool.hpp>
 #include <mongocxx/client.hpp>
 #include <mongocxx/stdx.hpp>
@@ -14,6 +15,7 @@
 #include <mongocxx/instance.hpp>
 #include <mongocxx/cursor.hpp>
 #include <mongocxx/options/find.hpp>
+#include <mongocxx/bulk_write.hpp>
 #include <bsoncxx/builder/stream/helpers.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/builder/stream/array.hpp>
@@ -74,6 +76,7 @@ class Mongodbc {
         std::string get_shipmentList(std::string collectionName, std::string query, std::string fieldProjection);
         std::string get_byOID(std::string collection, std::string projection, std::string oid);
         std::string get_documentList(std::string collectionName, std::string query, std::string fieldProjection);
+        std::int32_t create_bulk_shipment(std::string bulkShipment);
 
     private:
         std::string mURI;
