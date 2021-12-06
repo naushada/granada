@@ -135,13 +135,23 @@ class WebConnection : public ACE_Event_Handler {
 
         WebServer* parent() {
             return(m_parent);
-        } 
+        }
+
+        void expectedLength(ACE_INT32 len) {
+            m_expectedLength = len;
+        }
+
+        bool isCompleteRequestReceived();
+        bool isBufferingOfRequestCompleted();
+
 
     private:
         long m_timerId;
         ACE_HANDLE m_handle;
         ACE_INET_Addr m_connAddr;
         WebServer* m_parent;
+        ACE_Message_Block* m_req;
+        ACE_INT32 m_expectedLength;
 };
 
 class WebServer : public ACE_Event_Handler {
@@ -159,7 +169,7 @@ class WebServer : public ACE_Event_Handler {
 
         long start_conn_cleanup_timer(ACE_HANDLE handle);
         void stop_conn_cleanup_timer(long timerId);
-        void restart_conn_cleanup_timer(ACE_HANDLE handle);
+        void restart_conn_cleanup_timer(ACE_HANDLE handle, ACE_Time_Value to = ACE_Time_Value(60,0));
 
         std::unordered_map<ACE_HANDLE, WebConnection*>& connectionPool() {
           return(m_connectionPool);

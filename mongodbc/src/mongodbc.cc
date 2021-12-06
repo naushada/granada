@@ -428,6 +428,7 @@ std::int32_t Mongodbc::create_bulk_shipment(std::string bulkShipment)
 
     if(result) {
         cnt = result->inserted_count();
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l bulk document created is %d\n"), cnt));
     }
 
     return(cnt);
