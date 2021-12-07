@@ -423,6 +423,48 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
+    } else if(!uri.compare("/api/awbnolist")) {
+        std::string collectionName("shipping");
+        auto awbNo = http.get_element("shipmentNo");
+        auto accCode = http.get_element("accountCode");
+        std::string document("");
+
+        if(awbNo.length() && accCode.length()) {
+            /* do an authentication with DB now */
+            document = "{\"shipmentNo\" : \"" +
+                        awbNo + "\",\"accountCode\": \"" +
+                        accCode + "\" " +
+                        "}";
+        } else {
+            std::string lst("[");
+            std::string delim = ",";
+            auto start = 0U;
+            auto end = awbNo.find(delim);
+            while (end != std::string::npos)
+            {
+                lst += "\"" + awbNo.substr(start, end - start) + "\"" + delim;
+                start = end + delim.length();
+                end = awbNo.find(delim, start);
+            }
+            lst += "\"" + awbNo.substr(start) + "\"";
+            lst += "]";
+
+            document = "{\"shipmentNo\" : {\"$in\" : " +
+                        lst + 
+                        "}}";
+        }
+
+        //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
+        if(record.length()) {
+            return(build_responseOK(record));
+        } else {
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+        }
     } else if((!uri.compare("/api/shipmentlist"))) {
         std::string collectionName("shipping");
         auto fromDate = http.get_element("fromDate");
@@ -775,11 +817,12 @@ int MicroService::svc()
 
                 if(conIt != std::end(parent->connectionPool())) {
                     auto connEnt = conIt->second;
-                    parent->stop_conn_cleanup_timer(connEnt->timerId());
-                    parent->connectionPool().erase(conIt);
-                    connEnt->expectedLength(-1);
+                    ACE_Time_Value to(0,1);
+                    parent->restart_conn_cleanup_timer(handle, to);
+                    //parent->connectionPool().erase(conIt);
+                    //connEnt->expectedLength(-1);
                     //delete connEnt;
-                    close(handle);
+                    //close(handle);
                 }
 
                 m_mb->release();
