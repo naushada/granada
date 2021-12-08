@@ -465,6 +465,47 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
             return(build_responseERROR(err_message, err));
         }
+    } else if(!uri.compare("/api/detailed_report")) {
+        std::string collectionName("shipping");
+        auto fromDate = http.get_element("fromDate");
+        auto toDate = http.get_element("toDate");
+        auto country = http.get_element("country");
+        auto accCode = http.get_element("accountCode");
+        std::string document("");
+
+        if(fromDate.length() && toDate.length() && country.length() && accCode.length()) {
+            std::string lst("[");
+            std::string delim = ",";
+            auto start = 0U;
+            auto end = accCode.find(delim);
+            while (end != std::string::npos)
+            {
+                lst += "\"" + accCode.substr(start, end - start) + "\"" + delim;
+                start = end + delim.length();
+                end = accCode.find(delim, start);
+            }
+            lst += "\"" + accCode.substr(start) + "\"";
+            lst += "]";
+
+            document = "{\"accountCode\" : {\"$in\" : " +
+                        lst + 
+                        "}," +
+                        "\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+                        "\"$lte\": \"" + toDate + "\"}," +
+                        "\"country\" :\"" + country + "\"}"; 
+        }
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
+        if(record.length()) {
+            return(build_responseOK(record));
+        } else {
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+        }
     } else if((!uri.compare("/api/shipmentlist"))) {
         std::string collectionName("shipping");
         auto fromDate = http.get_element("fromDate");
