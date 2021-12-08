@@ -429,16 +429,11 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         auto accCode = http.get_element("accountCode");
         std::string document("");
 
-        if(awbNo.length() && accCode.length()) {
-            /* do an authentication with DB now */
-            document = "{\"shipmentNo\" : \"" +
-                        awbNo + "\",\"accountCode\": \"" +
-                        accCode + "\" " +
-                        "}";
-        } else {
-            std::string lst("[");
-            std::string delim = ",";
-            auto start = 0U;
+        std::string lst("[");
+        std::string delim = ",";
+        auto start = 0U;
+        if(awbNo.length()) {
+
             auto end = awbNo.find(delim);
             while (end != std::string::npos)
             {
@@ -448,13 +443,21 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
             }
             lst += "\"" + awbNo.substr(start) + "\"";
             lst += "]";
+        }
 
+        if(accCode.length()) {
+            /* do an authentication with DB now */
+            document = "{\"shipmentNo\" : {\"$in\" :" +
+                        lst + "},\"accountCode\": \"" +
+                        accCode + "\" " +
+                        "}";
+        } else {
             document = "{\"shipmentNo\" : {\"$in\" : " +
                         lst + 
                         "}}";
         }
 
-        //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
         std::string projection("{\"_id\" : false}");
         std::string record = dbInst.get_shipmentList(collectionName, document, projection);
         //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
