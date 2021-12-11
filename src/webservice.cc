@@ -661,6 +661,11 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n"), document.c_str()));
         bool rsp = dbInst.update_shipment(query, document);
+        if(rsp) {
+            std::string r("");
+            r = "{\"status\": \"success\"}";
+            return(build_responseOK(r));
+        }
     }
 #if 0
     size_t ct_offset = 0, cl_offset = 0;
@@ -694,6 +699,7 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
     }
 #endif
     return(build_responseOK(std::string()));
+
 }
 
 ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
@@ -759,8 +765,11 @@ ACE_Message_Block* MicroService::build_responseOK(std::string httpBody, std::str
 
     std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
     rsp->wr_ptr(http_header.length());
-    std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
-    rsp->wr_ptr(httpBody.length());
+
+    if(httpBody.length()) {
+        std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
+        rsp->wr_ptr(httpBody.length());
+    }
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response header\n%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
     return(rsp);
@@ -861,7 +870,7 @@ int MicroService::svc()
 
                 if(conIt != std::end(parent->connectionPool())) {
                     auto connEnt = conIt->second;
-                    ACE_Time_Value to(0,1);
+                    ACE_Time_Value to(0,1000);
                     parent->restart_conn_cleanup_timer(handle, to);
                     //parent->connectionPool().erase(conIt);
                     //connEnt->expectedLength(-1);
