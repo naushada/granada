@@ -667,39 +667,8 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
             return(build_responseOK(r));
         }
     }
-#if 0
-    size_t ct_offset = 0, cl_offset = 0;
-    /* Get the payload length */
-    if(std::string::npos != (ct_offset = in.find("Content-Type: ", 0)) && std::string::npos != (cl_offset = in.find("Content-Length: ", 0))) {
-        /* Both content Type & content Length are present */
-        size_t ct_offset_v = 0, cl_offset_v = 0;
-        ct_offset_v = in.find("\r\n", ct_offset);
-        cl_offset_v = in.find("\r\n", cl_offset);
-        std::string ct_match("Content-Type: ");
-        ct_offset += ct_match.length();
-        std::string cl_match("Content-Length: ");
-        cl_offset += cl_match.length();
 
-        std::string ct_value = in.substr(ct_offset, (ct_offset_v - ct_offset));
-        std::string cl_value = in.substr(cl_offset, (cl_offset_v - cl_offset));
-
-        if(!ct_value.compare("application/json")) {
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The content Type is application/json\n")));
-            std::string body_delimeter("\r\n\r\n");
-            size_t body_offset = in.find(body_delimeter, 0);
-            if(std::string::npos != body_offset) {
-                body_offset += body_delimeter.length();
-                std::string document = in.substr(body_offset);
-
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Document is writen in databse\n")));
-                /* write this document into data base now.*/
-                dbInst.create_shipment(document);
-            }
-        }
-    }
-#endif
     return(build_responseOK(std::string()));
-
 }
 
 ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
@@ -864,20 +833,6 @@ int MicroService::svc()
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), m_mb->length()));
                 /*! Process The Request */
                 process_request(handle, *m_mb, *dbInst);
-
-                /* client connection cleanup */
-                auto conIt = parent->connectionPool().find(handle);
-
-                if(conIt != std::end(parent->connectionPool())) {
-                    auto connEnt = conIt->second;
-                    ACE_Time_Value to(0,1000);
-                    parent->restart_conn_cleanup_timer(handle, to);
-                    //parent->connectionPool().erase(conIt);
-                    //connEnt->expectedLength(-1);
-                    //delete connEnt;
-                    //close(handle);
-                }
-
                 m_mb->release();
                 break;
             }
@@ -936,15 +891,18 @@ ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
 {
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebServer::handle_timedout\n")));
-    std::uintptr_t handle = reinterpret_cast<std::uintptr_t>(act);
-    auto conIt = m_connectionPool.find(handle);
+    std::uintptr_t _handle = reinterpret_cast<std::uintptr_t>(act);
+    auto conIt = m_connectionPool.find(_handle);
 
     if(conIt != std::end(m_connectionPool)) {
         WebConnection* connEnt = conIt->second;
+        m_connectionPool.erase(conIt);
         /* let the reactor call handle_close on this handle */
-        ACE_Reactor::instance()->remove_handler(handle, ACE_Event_Handler::READ_MASK);
+        ACE_Reactor::instance()->remove_handler(_handle, ACE_Event_Handler::READ_MASK | ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK);
         /* reclaim the heap memory */
         delete connEnt;
+    } else {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebServer::handle_timedout no connEnt found for handle %d\n"), _handle));
     }
 
     return(0);
@@ -1117,11 +1075,11 @@ bool WebServer::stop()
     return(true);
 }
 
-long WebServer::start_conn_cleanup_timer(ACE_HANDLE handle)
+long WebServer::start_conn_cleanup_timer(ACE_HANDLE handle, ACE_Time_Value to)
 {
     long timerId = -1;
     /* 30 minutes */
-    ACE_Time_Value to(1800,0);
+    //ACE_Time_Value to(1800,0);
     timerId = ACE_Reactor::instance()->schedule_timer(this, (const void *)handle, to);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l webserver cleanup timer is started for handle %d\n"), handle));
     return(timerId);
@@ -1130,7 +1088,9 @@ long WebServer::start_conn_cleanup_timer(ACE_HANDLE handle)
 void WebServer::stop_conn_cleanup_timer(long timerId) 
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l webserver connection cleanup timer is stopped\n")));
-    ACE_Reactor::instance()->cancel_timer(timerId);
+    if(ACE_Reactor::instance()->cancel_timer(timerId)) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Running timer is stopped succesfully\n")));
+    }
 }
 void WebServer::restart_conn_cleanup_timer(ACE_HANDLE handle, ACE_Time_Value to)
 {
@@ -1140,8 +1100,10 @@ void WebServer::restart_conn_cleanup_timer(ACE_HANDLE handle, ACE_Time_Value to)
     if(conIt != std::end(connectionPool())) {
         auto connEnt = conIt->second;
         long tId = connEnt->timerId();
-        ACE_Reactor::instance()->reset_timer_interval(tId, to);
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l webserver connection cleanup timer is re-started for handle %d\n"), handle));
+
+        if(!ACE_Reactor::instance()->reset_timer_interval(tId, to)) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l webserver connection cleanup timer is re-started for handle %d\n"), handle));
+        }
     }
 
 }
@@ -1182,9 +1144,16 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     }
 
     if(!m_expectedLength) {
-        ACE_Time_Value to(0,1);
-        //parent()->restart_conn_cleanup_timer(m_timerId, to);
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Request of length %d on connection %d\n"), m_expectedLength, m_handle));
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Request of length %d on connection %d 
+                                        memory will be reclaimed upon timer expiry\n"), m_expectedLength, m_handle));
+        if(timerId() > 0) {
+            ACE_Time_Value to(0,500);
+            parent()->stop_conn_cleanup_timer(timerId());
+            m_timerId = parent()->start_conn_cleanup_timer(handle, to);
+            return(-1);
+        }
+
         return(-1);
     }
 
@@ -1241,6 +1210,8 @@ ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 
 ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
 {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle close for handle - %d\n"), handle));
+    #if 0
     if(m_timerId > 0) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Running timer for handle %d is stopped\n"), handle));
         m_parent->stop_conn_cleanup_timer(m_timerId);
@@ -1252,7 +1223,9 @@ ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
         it = m_parent->connectionPool().erase(it);
         close(handle);
     }
+    #endif
 
+    close(handle);
     return(0);
 }
 

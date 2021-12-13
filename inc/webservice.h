@@ -167,7 +167,7 @@ class WebServer : public ACE_Event_Handler {
         bool start();
         bool stop();
 
-        long start_conn_cleanup_timer(ACE_HANDLE handle);
+        long start_conn_cleanup_timer(ACE_HANDLE handle, ACE_Time_Value to = ACE_Time_Value(1800,0));
         void stop_conn_cleanup_timer(long timerId);
         void restart_conn_cleanup_timer(ACE_HANDLE handle, ACE_Time_Value to = ACE_Time_Value(60,0));
 
