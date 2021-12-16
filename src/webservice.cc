@@ -646,6 +646,19 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
         /** Update on Shipping */
         std::string content = http.body();
         std::string awbNo = http.get_element("shipmentNo");
+        std::string lst("[");
+        std::string delim = ",";
+        auto start = 0U;
+        auto end = awbNo.find(delim);
+        while (end != std::string::npos)
+        {
+            lst += "\"" + awbNo.substr(start, end - start) + "\"" + delim;
+            start = end + delim.length();
+            end = awbNo.find(delim, start);
+        }
+        lst += "\"" + awbNo.substr(start) + "\"";
+        lst += "]";
+
         #if 0
         std::string accountCode = http.get_element("accountCode");
         std::string query = "{\"accountCode\" : \"" +
@@ -654,12 +667,17 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
                              awbNo + "\"" +
                              "}";
         #endif
-        std::string query = "{\"shipmentNo\" : \"" +
-                             awbNo + "\"" +
-                             "}";
+        std::string query = "{\"shipmentNo\" : {\"$in\" :" +
+                             lst + "}}";
+
+        #if 0
+        std::string query = "{\"shipmentNo\" : " +
+                             lst + "}";
+
+        #endif
         std::string document = "{\"$push\": {\"activity\" : " + content + "}}";
 
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n"), document.c_str()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n Query %s\n"), document.c_str(), query.c_str()));
         bool rsp = dbInst.update_shipment(query, document);
         if(rsp) {
             std::string r("");
@@ -1245,7 +1263,7 @@ bool WebConnection::isCompleteRequestReceived()
 bool WebConnection::isBufferingOfRequestCompleted() 
 {
     /* This is a new Request */
-    std::array<std::uint8_t, 1024> scratch_pad;
+    std::array<std::uint8_t, 2048> scratch_pad;
     std::int32_t len = -1;
     /** read first 1024 bytes or less */
     scratch_pad.fill(0);

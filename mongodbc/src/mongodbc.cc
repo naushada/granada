@@ -159,7 +159,37 @@ bool Mongodbc::update_shipment(std::string match, std::string shippingRecord)
         auto collection = dbInst.collection("shipping");
         //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
 
-        bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_one(filter.view(), toUpdate.view());
+        mongocxx::options::bulk_write bulk_opt;
+        mongocxx::write_concern wc;
+        bulk_opt.ordered(false);
+        wc.acknowledge_level(mongocxx::write_concern::level::k_default);
+        bulk_opt.write_concern(wc);
+        auto bulk = collection.create_bulk_write(bulk_opt);
+        #if 0 
+        bsoncxx::document::view filter_view = filter.view();
+        auto item = filter_view["shipmentNo"];
+        if(item && item.type() == bsoncxx::type::k_array) {
+            auto subArr = item.get_array().value;
+            for(auto elm : subArr) {
+                if(elm.type() == bsoncxx::type::k_utf8) {
+                    //auto val = elm.get_utf8().value;
+                    auto val = elm.get_utf8().value;
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The element is %s\n"), bsoncxx::string::to_string(val).c_str()));
+                }
+            }
+        }
+        #endif
+        mongocxx::model::update_many upd(filter.view(), toUpdate.view());
+        bulk.append(upd);
+
+        auto result = bulk.execute();
+        std::int32_t cnt = 0;
+        if(result) {
+            //cnt = result->updated_count();
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l bulk document updated is %d\n"), cnt));
+        }
+        //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
+        //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_one(filter.view(), toUpdate.view());
         if(result) {
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The collection is updated %s\n"), shippingRecord.c_str()));
             return(true);
@@ -434,4 +464,10 @@ std::int32_t Mongodbc::create_bulk_shipment(std::string bulkShipment)
     return(cnt);
 }
 
+/*
+std::int32_t Mongodbc::update_bulk_shipment(std::string bulkShipment)
+{
+
+}
+*/
 #endif /* __mongodbc_cc__*/
