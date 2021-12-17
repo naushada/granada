@@ -571,6 +571,11 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
                         "\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
                         "\"$lte\": \"" + toDate + "\"}," +
                         "\"country\" :\"" + country + "\"}"; 
+        } else if(fromDate.length() && toDate.length() && country.length()) {
+
+            document = "{\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+                        "\"$lte\": \"" + toDate + "\"}," +
+                        "\"country\" :\"" + country + "\"}"; 
         }
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
