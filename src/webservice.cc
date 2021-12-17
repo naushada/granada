@@ -336,7 +336,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         std::string query = "{\"role\" : \"Customer\" }";
 
         //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
-        std::string projection("{\"_id\" : false, \"accountCode\": true}");
+        std::string projection("{\"_id\" : false, \"accountCode\": true, \"name\" : true}");
         std::string record = dbInst.get_documentList(collectionName, query, projection);
         if(!record.length()) {
             /* No Customer Account is found */
@@ -461,6 +461,81 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         std::string projection("{\"_id\" : false}");
         std::string record = dbInst.get_shipmentList(collectionName, document, projection);
         //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
+        if(record.length()) {
+            return(build_responseOK(record));
+        } else {
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+        }
+
+    } else if(!uri.compare("/api/senderRefNoList")) {
+        std::string collectionName("shipping");
+        auto refNo = http.get_element("senderRefNo");
+        auto accCode = http.get_element("accountCode");
+        std::string document("");
+
+        std::string lst("[");
+        std::string delim = ",";
+        auto start = 0U;
+        if(refNo.length()) {
+
+            auto end = refNo.find(delim);
+            while (end != std::string::npos)
+            {
+                lst += "\"" + refNo.substr(start, end - start) + "\"" + delim;
+                start = end + delim.length();
+                end = refNo.find(delim, start);
+            }
+            lst += "\"" + refNo.substr(start) + "\"";
+            lst += "]";
+        }
+
+        if(accCode.length()) {
+            /* do an authentication with DB now */
+            document = "{\"referenceNo\" : {\"$in\" :" +
+                        lst + "},\"accountCode\": \"" +
+                        accCode + "\" " +
+                        "}";
+        } else {
+            document = "{\"referenceNo\" : {\"$in\" : " +
+                        lst + 
+                        "}}";
+        }
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
+        if(record.length()) {
+            return(build_responseOK(record));
+        } else {
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid Reference No.\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+        }
+
+    } else if(!uri.compare("/api/senderRefNo")) {
+        std::string collectionName("shipping");
+        auto refNo = http.get_element("senderRefNo");
+        auto accCode = http.get_element("accountCode");
+        std::string document("");
+
+        if(refNo.length() && accCode.length()) {
+            /* do an authentication with DB now */
+            document = "{\"referenceNo\" : \"" +
+                        refNo + "\",\"accountCode\": \"" +
+                        accCode + "\" " +
+                        "}";
+        } else {
+            document = "{\"referenceNo\" : \"" +
+                        refNo + "\" " +
+                        "}";
+        }
+
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_shipment(collectionName, document, projection);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l RefNo Response %s\n"), record.c_str()));
         if(record.length()) {
             return(build_responseOK(record));
         } else {
