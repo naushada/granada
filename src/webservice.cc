@@ -97,6 +97,44 @@ ACE_Message_Block* MicroService::handle_DELETE(ACE_Message_Block& in, Mongodbc& 
 
 }
 
+ACE_Message_Block* MicroService::handle_DELETE(std::string& in, Mongodbc& dbInst)
+{
+    Http http(in);
+
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/deleteAwbList")) {
+        /** Delete Shipment */
+        std::string awbNo = http.get_element("awbList");
+        std::string lst("[");
+        std::string delim = ",";
+        auto start = 0U;
+        auto end = awbNo.find(delim);
+        while (end != std::string::npos)
+        {
+            lst += "\"" + awbNo.substr(start, end - start) + "\"" + delim;
+            start = end + delim.length();
+            end = awbNo.find(delim, start);
+        }
+        lst += "\"" + awbNo.substr(start) + "\"";
+        lst += "]";
+
+        std::string document = "{\"shipmentNo\": {\"$in\" : " + lst + "}}";
+        bool rsp = dbInst.delete_shipment(document);
+
+        if(rsp) {
+            std::string r("");
+            r = "{\"status\": \"success\"}";
+            return(build_responseOK(r));
+        } 
+    }
+
+    std::string err("400 Bad Request");
+    std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
+    return(build_responseERROR(err_message, err));
+}
+
 ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb, Mongodbc& dbInst)
 {
     std::string http_header, http_body;
@@ -117,7 +155,7 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     } else if(std::string::npos != req.find("PUT", 0)) {
       rsp = handle_PUT(req, dbInst);
     } else if(std::string::npos != req.find("DELETE", 0)) {
-      rsp = handle_DELETE(mb, dbInst);  
+      rsp = handle_DELETE(req, dbInst);  
     } else {
       /* Not supported Method */
     }
