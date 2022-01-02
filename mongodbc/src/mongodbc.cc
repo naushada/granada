@@ -185,9 +185,17 @@ bool Mongodbc::update_shipment(std::string match, std::string shippingRecord)
         auto result = bulk.execute();
         std::int32_t cnt = 0;
         if(result) {
-            //cnt = result->updated_count();
+            //cnt = result->modified_count();
+            //cnt = result->inserted_count();
+            cnt = result->matched_count();
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l bulk document updated is %d\n"), cnt));
+            if(!cnt) {
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Shipment Update is failed\n")));
+                return(false);
+            }
+            return(true);
         }
+        #if 0
         //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_many(filter.view(), toUpdate.view());
         //bsoncxx::stdx::optional<mongocxx::result::update> result = collection.update_one(filter.view(), toUpdate.view());
         if(result) {
@@ -197,6 +205,7 @@ bool Mongodbc::update_shipment(std::string match, std::string shippingRecord)
             return(false);
         }
         //bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(shippingRecord.view());
+        #endif
     }
     #if 0
     bsoncxx::document::value new_shipment = bsoncxx::from_json(shippingRecord.c_str());

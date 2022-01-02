@@ -832,7 +832,7 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
                              "}";
         #endif
         std::string query = "{\"shipmentNo\" : {\"$in\" :" +
-                             lst + "}}";
+                             lst + "}," + "\"activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}"+ "}";
 
         #if 0
         std::string query = "{\"shipmentNo\" : " +
@@ -848,6 +848,9 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
             r = "{\"status\": \"success\"}";
             return(build_responseOK(r));
         }
+        std::string err("400 Bad Request");
+        std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
+        return(build_responseERROR(err_message, err));
     }
 
     return(build_responseOK(std::string()));
