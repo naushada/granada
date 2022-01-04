@@ -89,7 +89,7 @@ class Mongodbc {
         mongocxx::client* mMongoConn;
         /* Pool of db connections */
         mongocxx::pool* mMongoConnPool;
-        mongocxx::instance* mInstance;
+        //mongocxx::instance* mInstance;
         mongocxx::uri mMongoUri;
         std::mutex mMutex;
 };

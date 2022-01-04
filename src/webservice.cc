@@ -103,24 +103,39 @@ ACE_Message_Block* MicroService::handle_DELETE(std::string& in, Mongodbc& dbInst
 
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
+    std::string document("");
 
     if(!uri.compare("/api/deleteAwbList")) {
         /** Delete Shipment */
         std::string awbNo = http.get_element("awbList");
-        std::string lst("[");
-        std::string delim = ",";
-        auto start = 0U;
-        auto end = awbNo.find(delim);
-        while (end != std::string::npos)
-        {
-            lst += "\"" + awbNo.substr(start, end - start) + "\"" + delim;
-            start = end + delim.length();
-            end = awbNo.find(delim, start);
-        }
-        lst += "\"" + awbNo.substr(start) + "\"";
-        lst += "]";
+        std::string startDate = http.get_element("startDate");
+        std::string endDate = http.get_element("endDate");
+        if(awbNo.length()) {
+            std::string lst("[");
+            std::string delim = ",";
+            auto start = 0U;
+            auto end = awbNo.find(delim);
+            while (end != std::string::npos)
+            {
+                lst += "\"" + awbNo.substr(start, end - start) + "\"" + delim;
+                start = end + delim.length();
+                end = awbNo.find(delim, start);
+            }
+            lst += "\"" + awbNo.substr(start) + "\"";
+            lst += "]";
 
-        std::string document = "{\"shipmentNo\": {\"$in\" : " + lst + "}}";
+            document = "{\"shipmentNo\": {\"$in\" : " + lst + "}}";
+
+        } else if(startDate.length() && endDate.length()) {
+
+            document = "{\"createdOn\": {\"$gte\" : \"" + startDate + "\"," + "\"$lte\" :\"" + endDate +"\"" +"}}";
+        } else {
+
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+        }
+
         bool rsp = dbInst.delete_shipment(document);
 
         if(rsp) {
@@ -1086,6 +1101,7 @@ ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
         ACE_Reactor::instance()->remove_handler(_handle, ACE_Event_Handler::READ_MASK | ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK);
         /* reclaim the heap memory */
         delete connEnt;
+        close(_handle);
     } else {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebServer::handle_timedout no connEnt found for handle %d\n"), _handle));
     }
@@ -1331,10 +1347,10 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     if(!m_expectedLength) {
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Request of length %d on connection %d" 
-                                        "memory will be reclaimed upon timer expiry\n"), m_expectedLength, m_handle));
+                                        " memory will be reclaimed upon timer expiry\n"), m_expectedLength, m_handle));
         if(timerId() > 0) {
             /* start 1/2 second timer i.e. 500 milli second*/
-            ACE_Time_Value to(0,500);
+            ACE_Time_Value to(0,1);
             parent()->stop_conn_cleanup_timer(timerId());
             m_timerId = parent()->start_conn_cleanup_timer(handle, to);
             return(-1);
@@ -1393,7 +1409,7 @@ ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 
 ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle close for handle - %d\n"), handle));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l WebConnection::handle_close handle %d will be closed upon timer expiry\n"), handle));
     #if 0
     if(m_timerId > 0) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Running timer for handle %d is stopped\n"), handle));
@@ -1408,7 +1424,8 @@ ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
     }
     #endif
 
-    close(handle);
+    /* hold the fd close till timer is expired , otherwise we may get new connection on that fd.*/
+    //close(handle);
     return(0);
 }
 
@@ -1432,7 +1449,7 @@ bool WebConnection::isBufferingOfRequestCompleted()
     /* This is a new Request */
     std::array<std::uint8_t, 2048> scratch_pad;
     std::int32_t len = -1;
-    /** read first 1024 bytes or less */
+    /** read first 2048 bytes or less */
     scratch_pad.fill(0);
 
     if(m_expectedLength < 0) {

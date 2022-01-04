@@ -9,7 +9,7 @@
 Mongodbc::Mongodbc()
 {
     mMongoConn = nullptr;
-    mInstance = nullptr;
+    //mInstance = nullptr;
     mURI.clear();
     mdbName.clear();
 
@@ -18,18 +18,19 @@ Mongodbc::Mongodbc()
 Mongodbc::Mongodbc(std::string uri_str, std::string db_name, std::uint32_t poolSize)
 {
     mMongoConn = nullptr;
-    mInstance = nullptr;
+    //mInstance = nullptr;
     mMongoConnPool = nullptr;
     mURI = uri_str;
     mdbName = db_name;
 
-    mInstance = new mongocxx::instance();
+    //mInstance = new mongocxx::instance();
     do {
+        #if 0
         if(nullptr == mInstance) {
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l instantiation of mongocxx::instance is failed\n")));
             break;
         }
-
+        #endif
         if(!poolSize) {
 
             mongocxx::uri uri(uri_str.c_str());
@@ -54,7 +55,8 @@ Mongodbc::Mongodbc(std::string uri_str, std::string db_name, std::uint32_t poolS
             std::string poolUri(uri_str);
             /* reference: http://mongocxx.org/mongocxx-v3/connection-pools/ */
             //poolUri += "/?minPoolSize=10&maxPoolSize=" + std::to_string(poolSize);
-            poolUri += "&minPoolSize=10&maxPoolSize=" + std::to_string(poolSize);
+            //poolUri += "&minPoolSize=10&maxPoolSize=" + std::to_string(poolSize);
+            poolUri += "&maxPoolSize=" + std::to_string(poolSize);
             mongocxx::uri uri(poolUri.c_str());
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l The URI is %s\n"), poolUri.c_str()));
             mMongoConnPool = new mongocxx::pool(uri);
@@ -75,9 +77,11 @@ Mongodbc::~Mongodbc()
         delete mMongoConn;
     }
 
+#if 0
     if(nullptr != mInstance) {
         delete mInstance;
     }
+#endif
 }
 
 void Mongodbc::dump_document(CollectionName collection)
@@ -116,6 +120,8 @@ std::string Mongodbc::create_shipment(std::string shipmentRecord, std::string pr
         bsoncxx::oid oid = result->inserted_id().get_oid().value;
         std::string JobID = oid.to_string();
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid is %s\n"), JobID.c_str()));
+        /* Return client connection to pool */
+        conn = nullptr;
         return(JobID);
 
         /* Get the newly added shipmentNo */
@@ -349,6 +355,7 @@ std::string Mongodbc::validate_user(std::string collectionName, std::string quer
     mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
     mongocxx::cursor::iterator iter = cursor.begin();
     //bsoncxx::document::view res = *cursor.begin();
+    conn = nullptr;
 
     if(iter == cursor.end()) {
         return(std::string());
@@ -451,6 +458,7 @@ std::string Mongodbc::get_documentList(std::string collectionName, std::string q
     mongocxx::cursor::iterator iter = cursor.begin();
 
     if(iter == cursor.end()) {
+        conn = nullptr;
         return(std::string());
     }
 
@@ -464,7 +472,7 @@ std::string Mongodbc::get_documentList(std::string collectionName, std::string q
     }
     result.seekp(-1, std::ios_base::end);
     result << "]";
-
+    conn = nullptr;
     return(std::string(result.str()));
 
     #if 0
