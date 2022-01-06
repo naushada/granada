@@ -24,22 +24,9 @@
 
 #include "ace/Log_Msg.h"
 
-enum class CollectionName : std::uint32_t {
-    SHIPPING = 0,
-    JOB_SCHEDULING,
-    MANIFESTING,
-    SUPPLIES,
-    SHIPMENT_PRICING,
-
-    TRACKING,
-    REPORTING,
-
-    INVALID
-};
-
 class Mongodbc {
     public:
-        Mongodbc(std::string uri, std::string db_name, std::uint32_t poolSize = 50u);
+        Mongodbc(std::string uri, std::string db_name);
         Mongodbc();
         ~Mongodbc();
 
@@ -63,35 +50,22 @@ class Mongodbc {
             return(mMongoDbInst);
         }
 
-        mongocxx::collection& get_collection(CollectionName tableName) {
-            return(mMongoCollections[static_cast<size_t>(tableName)]);
-        }
-
-        std::string create_shipment(std::string shippingRecord, std::string projection);
-        bool update_shipment(std::string match, std::string shippingRecord);
-        bool delete_shipment(std::string shippingRecord);
-        std::string get_shipment(std::string collectionName, std::string key, std::string fieldProjection);
-        void dump_document(CollectionName collection);
-        std::string validate_user(std::string collectionName, std::string query, std::string fieldProjection);
-        std::string create_account(std::string accountRecord, std::string projection);
-        std::string get_accountInfo(std::string collectionName, std::string query, std::string fieldProjection);
-        std::string get_shipmentList(std::string collectionName, std::string query, std::string fieldProjection);
+        bool update_collection(std::string coll, std::string filter, std::string document);
+        bool delete_document(std::string coll, std::string shippingRecord);
+        std::string create_document(std::string coll, std::string accountRecord);
+        std::string get_document(std::string collectionName, std::string query, std::string fieldProjection);
+        std::string get_documents(std::string collectionName, std::string query, std::string fieldProjection);
         std::string get_byOID(std::string collection, std::string projection, std::string oid);
         std::string get_documentList(std::string collectionName, std::string query, std::string fieldProjection);
-        std::int32_t create_bulk_shipment(std::string bulkShipment);
+        std::int32_t create_bulk_document(std::string coll, std::string doc);
 
     private:
         std::string mURI;
         std::string mdbName;
-        std::array<std::string, 32>mCollections;
         mongocxx::database mMongoDbInst;
-        std::array<mongocxx::collection, 64> mMongoCollections;
-        mongocxx::client* mMongoConn;
         /* Pool of db connections */
         mongocxx::pool* mMongoConnPool;
-        //mongocxx::instance* mInstance;
-        mongocxx::uri mMongoUri;
-        std::mutex mMutex;
+        mongocxx::instance* mInstance;
 };
 
 

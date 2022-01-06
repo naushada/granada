@@ -4,99 +4,6 @@
 #include "webservice.h"
 #include "http_parser.h"
 
-ACE_Message_Block* MicroService::handle_OPTIONS(ACE_Message_Block& in)
-{
-    std::string http_header;
-    http_header = "HTTP/1.1 200 OK\r\n";
-    http_header += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
-    http_header += "Access-Control-Allow-Headers: DNT, User-Agent, X-Requested-With, If-Modified-Since, Cache-Control, Content-Type, Range\r\n";
-    http_header += "Access-Control-Max-Age: 1728000\r\n";
-    http_header += "Access-Control-Allow-Origin: *\r\n";
-    http_header += "Content-Type: text/plain; charset=utf-8\r\n";
-    http_header += "Content-Length: 0\r\n";
-    http_header += "\r\n\r\n";
-    ACE_Message_Block* rsp = nullptr;
-
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
-
-    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    rsp->wr_ptr(http_header.length());
-
-    //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
-    return(rsp);
-}
-
-ACE_Message_Block* MicroService::handle_GET(ACE_Message_Block& in, Mongodbc& dbInst)
-{
-    std::string http_header, http_body;
-    ACE_Message_Block* rsp = nullptr;
-
-    http_body = "{\"name\": \"Testing Now\"}";
-
-    http_header = "HTTP/1.1 200 OK\r\n";
-    http_header += "Content-Length: " + std::to_string(http_body.length()) + "\r\n";
-    http_header += "Content-Type: text/html\r\n";
-    http_header += "Connection: keep-alive\r\n";
-
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
-
-    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    rsp->wr_ptr(http_header.length());
-    //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
-
-    return(rsp);
-}
-
-ACE_Message_Block* MicroService::handle_POST(ACE_Message_Block& in, Mongodbc& dbInst)
-{
-    std::string http_header;
-    ACE_Message_Block* rsp = nullptr;
-
-    http_header = "HTTP/1.1 200 OK\r\n";
-    http_header += "Connection: keep-alive\r\n";
-    http_header += "Content-Length: 0\r\n";
-
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
-
-    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    rsp->wr_ptr(http_header.length());
-
-    //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
-    return(rsp);
-}
-
-ACE_Message_Block* MicroService::handle_PUT(ACE_Message_Block& in, Mongodbc& dbInst)
-{
-    std::string http_header, http_body;
-    ACE_Message_Block* rsp = nullptr;
-
-    http_body = "<html><title>HHHHHH</title><body><h5>Hello Naushad</h5></body>";
-
-    http_header = "HTTP/1.1 200 OK\r\n";
-    http_header += "Access-Control-Allow-Origin: *\r\n";
-    http_header += "Access-Control-Allow-Methods: GET,POST,OPTIONS,DELETE,PUT\r\n";
-    http_header += "Content-Length: " + std::to_string(http_body.length()) + "\r\n";
-    http_header += "Content-Type: text/html\r\n";
-    http_header += "Connection: keep-alive\r\n";
-
-}
-
-ACE_Message_Block* MicroService::handle_DELETE(ACE_Message_Block& in, Mongodbc& dbInst)
-{
-    std::string http_header, http_body;
-    ACE_Message_Block* rsp = nullptr;
-
-    http_body = "<html><title>HHHHHH</title><body><h5>Hello Naushad</h5></body>";
-
-    http_header = "HTTP/1.1 200 OK\r\n";
-    http_header += "Access-Control-Allow-Origin: *\r\n";
-    http_header += "Access-Control-Allow-Methods: GET,POST,OPTIONS,DELETE,PUT\r\n";
-    http_header += "Content-Length: " + std::to_string(http_body.length()) + "\r\n";
-    http_header += "Content-Type: text/html\r\n";
-    http_header += "Connection: keep-alive\r\n";
-
-}
-
 ACE_Message_Block* MicroService::handle_DELETE(std::string& in, Mongodbc& dbInst)
 {
     Http http(in);
@@ -107,6 +14,7 @@ ACE_Message_Block* MicroService::handle_DELETE(std::string& in, Mongodbc& dbInst
 
     if(!uri.compare("/api/deleteAwbList")) {
         /** Delete Shipment */
+        std::string coll("shipping");
         std::string awbNo = http.get_element("awbList");
         std::string startDate = http.get_element("startDate");
         std::string endDate = http.get_element("endDate");
@@ -136,7 +44,7 @@ ACE_Message_Block* MicroService::handle_DELETE(std::string& in, Mongodbc& dbInst
             return(build_responseERROR(err_message, err));
         }
 
-        bool rsp = dbInst.delete_shipment(document);
+        bool rsp = dbInst.delete_document(coll, document);
 
         if(rsp) {
             std::string r("");
@@ -160,9 +68,7 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     std::string req(mb.rd_ptr(), mb.length());
 
     if(std::string::npos != req.find("OPTIONS", 0)) {
-      //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l HTTP Method is OPTIONS\n")));
       rsp = handle_OPTIONS(req);
-      //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response\n%s"), rsp->length(), rsp->rd_ptr()));
     } else if(std::string::npos != req.find("GET", 0)) {
       rsp = handle_GET(req, dbInst); 
     } else if(std::string::npos != req.find("POST", 0)) {
@@ -179,6 +85,7 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     if(nullptr != rsp) {
 
       std::string response(rsp->rd_ptr(), rsp->length());
+      /** reclaim the memory now*/
       rsp->release();
       std::int32_t  toBeSent = response.length();
       std::int32_t offset = 0;
@@ -191,8 +98,6 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
         offset += ret;
         ret = 0;
       } while((toBeSent != offset));
-
-      //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d bytes sent %d\n"), response.length(), offset));
     }
     return(ret);
 }
@@ -249,15 +154,13 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
         std::string content = http.body();
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http request body length %d \n Request Body %s\n"), content.length(), content.c_str()));
         if(content.length()) {
-            std::string record = dbInst.create_shipment(content, projection);
+            std::string record = dbInst.create_document(collectionName, content);
 
             if(record.length()) {
                 std::string rsp("");
                 rsp = "{\"oid\" : \"" + record + "\"}";
                 return(build_responseOK(rsp));
             }
-
-            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for shipping ->\n %s\n"), content.c_str()));
         } 
     } else if(!uri.compare("/api/account")) {
         std::string collectionName("account");
@@ -266,7 +169,7 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
         std::string content = http.body();
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http request body length %d \n Request Body %s\n"), content.length(), content.c_str()));
         if(content.length()) {
-            std::string oid = dbInst.create_account(content, projection);
+            std::string oid = dbInst.create_document(collectionName, content);
 
             if(oid.length()) {
                 //std::string rsp = dbInst.get_byOID(collectionName, projection, oid);
@@ -275,14 +178,13 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
 
                 return(build_responseOK(rsp));
             }
-
-            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for account ->\n %s\n"), content.c_str()));
         }
     } else if(!uri.compare("/api/bulk/shipping")) {
         std::string content = http.body();
+        std::string coll("shipping");
         if(content.length()) {
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
-            std::int32_t cnt = dbInst.create_bulk_shipment(content);
+            std::int32_t cnt = dbInst.create_bulk_document(coll, content);
 
             if(cnt) {
                 std::string rec = "{\"createdShipments\": " + std::to_string(cnt) + "}";
@@ -293,31 +195,7 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
                 return(build_responseERROR(err_message, err));
             }
         }
-    } else if(!uri.compare("/api/account")) {
-        std::string collectionName("account");
-
-        /* user is trying to log in - authenticate now */
-        auto user = http.get_element("accountCode");
-
-        if(user.length()) {
-            /* do an authentication with DB now */
-            std::string document = "{\"accountCode\" : \"" +  user + "\" " + 
-                                    "}";
-            //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
-            std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.get_accountInfo(collectionName, document, projection);
-            if(record.length()) {
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
-                return(build_responseOK(record));
-            } else {
-                std::string err("400 Bad Request");
-                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid Account Code\", \"errorCode\" : 400}");
-
-            }
-
-            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l New Document for shipping ->\n %s\n"), content.c_str()));
-        }
-    }
+    } 
     return(build_responseOK(std::string()));
 }
 
@@ -345,7 +223,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
                                     "}";
             //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
             std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.validate_user(collectionName, document, projection);
+            std::string record = dbInst.get_document(collectionName, document, projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l User or Customer details %s\n"), record.c_str()));
             if(!record.length()) {
                 std::string err("400 Bad Request");
@@ -371,7 +249,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
                                     "}";
             //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
             std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.get_accountInfo(collectionName, document, projection);
+            std::string record = dbInst.get_document(collectionName, document, projection);
             if(record.length()) {
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
                 return(build_responseOK(record));
@@ -390,7 +268,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
         //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
         std::string projection("{\"_id\" : false, \"accountCode\": true, \"name\" : true}");
-        std::string record = dbInst.get_documentList(collectionName, query, projection);
+        std::string record = dbInst.get_documents(collectionName, query, projection);
         if(!record.length()) {
             /* No Customer Account is found */
             std::string err("404 Not Found");
@@ -414,7 +292,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
                                     awbNo + "\"" +
                                     "}";
            std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.get_shipment(collectionName, document, projection);
+            std::string record = dbInst.get_document(collectionName, document, projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l AWB Way Bills %s\n"), record.c_str()));
             return(build_responseOK(record));
         }
@@ -437,7 +315,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
         }
         std::string projection("{\"_id\" : false}");
-        std::string record = dbInst.get_shipment(collectionName, document, projection);
+        std::string record = dbInst.get_document(collectionName, document, projection);
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l altRefNo Response %s\n"), record.c_str()));
         if(record.length()) {
             return(build_responseOK(record));
@@ -466,7 +344,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         }
 
         std::string projection("{\"_id\" : false}");
-        std::string record = dbInst.get_shipment(collectionName, document, projection);
+        std::string record = dbInst.get_document(collectionName, document, projection);
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
         if(record.length()) {
             return(build_responseOK(record));
@@ -512,7 +390,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
         std::string projection("{\"_id\" : false}");
-        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        std::string record = dbInst.get_documents(collectionName, document, projection);
         //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
         if(record.length()) {
             return(build_responseOK(record));
@@ -558,7 +436,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
         std::string projection("{\"_id\" : false}");
-        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        std::string record = dbInst.get_documents(collectionName, document, projection);
         //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
         if(record.length()) {
             return(build_responseOK(record));
@@ -604,7 +482,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
         std::string projection("{\"_id\" : false}");
-        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        std::string record = dbInst.get_documents(collectionName, document, projection);
         //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
         if(record.length()) {
             return(build_responseOK(record));
@@ -633,7 +511,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         }
 
         std::string projection("{\"_id\" : false}");
-        std::string record = dbInst.get_shipment(collectionName, document, projection);
+        std::string record = dbInst.get_document(collectionName, document, projection);
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l RefNo Response %s\n"), record.c_str()));
         if(record.length()) {
             return(build_responseOK(record));
@@ -679,7 +557,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
         std::string projection("{\"_id\" : false}");
-        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        std::string record = dbInst.get_documents(collectionName, document, projection);
         //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
         if(record.length()) {
             return(build_responseOK(record));
@@ -707,7 +585,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         }
 
         std::string projection("{\"_id\" : false}");
-        std::string record = dbInst.get_shipmentList(collectionName, document, projection);
+        std::string record = dbInst.get_documents(collectionName, document, projection);
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l shipmentList Query %s\n"), document.c_str()));
 
         if(record.length()) {
@@ -823,6 +701,7 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
 
     if(!uri.compare("/api/shipment")) {
         /** Update on Shipping */
+        std::string coll("shipping");
         std::string content = http.body();
         std::string awbNo = http.get_element("shipmentNo");
         std::string lst("[");
@@ -857,7 +736,7 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
         std::string document = "{\"$push\": {\"activity\" : " + content + "}}";
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n Query %s\n"), document.c_str(), query.c_str()));
-        bool rsp = dbInst.update_shipment(query, document);
+        bool rsp = dbInst.update_collection(coll, query, document);
         if(rsp) {
             std::string r("");
             r = "{\"status\": \"success\"}";
@@ -1006,8 +885,9 @@ int MicroService::svc()
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is spawned\n")));
     while(m_continue) {
-        if(-1 != getq(m_mb)) {
-            switch (m_mb->msg_type())
+        ACE_Message_Block *mb = nullptr;
+        if(-1 != getq(mb)) {
+            switch (mb->msg_type())
             {
             case ACE_Message_Block::MB_DATA:
             {
@@ -1015,33 +895,33 @@ int MicroService::svc()
                  | 4-bytes handle   | 4-bytes db instance pointer   | request (payload) |
                  |_ _ _ _ _ _ _ _ _ |_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _|_ _ _ _ _ _ _ _ _ _|
                 */
-                ACE_HANDLE handle = *((ACE_HANDLE *)m_mb->rd_ptr());
-                m_mb->rd_ptr(sizeof(ACE_HANDLE));
+                ACE_HANDLE handle = *((ACE_HANDLE *)mb->rd_ptr());
+                mb->rd_ptr(sizeof(ACE_HANDLE));
 
-                std::uintptr_t inst = *((std::uintptr_t *)m_mb->rd_ptr());
+                std::uintptr_t inst = *((std::uintptr_t *)mb->rd_ptr());
                 Mongodbc* dbInst = reinterpret_cast<Mongodbc*>(inst);
-                m_mb->rd_ptr(sizeof(uintptr_t));
+                mb->rd_ptr(sizeof(uintptr_t));
 
                 /* Parent instance */
-                std::uintptr_t parent_inst = *((std::uintptr_t *)m_mb->rd_ptr());
+                std::uintptr_t parent_inst = *((std::uintptr_t *)mb->rd_ptr());
                 WebServer* parent = reinterpret_cast<WebServer*>(parent_inst);
-                m_mb->rd_ptr(sizeof(uintptr_t));
+                mb->rd_ptr(sizeof(uintptr_t));
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s dbName %s\n"), dbInst->get_uri().c_str(), dbInst->get_dbName().c_str()));
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, m_mb->length()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, mb->length()));
 
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), m_mb->length()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), mb->length()));
                 /*! Process The Request */
-                process_request(handle, *m_mb, *dbInst);
-                m_mb->release();
+                process_request(handle, *mb, *dbInst);
+                mb->release();
                 break;
             }
             case ACE_Message_Block::MB_PCSIG:
                 {
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Got MB_PCSIG \n")));
                     m_continue = false;
-                    if(m_mb != NULL) {
-                        m_mb->release();
+                    if(mb != NULL) {
+                        mb->release();
                     }
                     msg_queue()->deactivate();
                     break;
@@ -1049,11 +929,13 @@ int MicroService::svc()
             default:
                 {
                     m_continue = false;
+                    mb->release();
                     break;
                 }
             }
         } else {
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is stopped\n")));
+            mb->release();
             m_continue = false;
         }
     }
@@ -1065,14 +947,11 @@ MicroService::MicroService(ACE_Thread_Manager* thr_mgr) :
     ACE_Task<ACE_MT_SYNCH>(thr_mgr)
 {
     m_continue = true;
-    m_mb = nullptr;
-    //ACE_NEW_NORETURN(m_mb, ACE_Message_Block((size_t)MemorySize::SIZE_1MB));
     m_threadId = thr_mgr->thr_self();
 }
 
 MicroService::~MicroService()
 {
-    m_mb->release();
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Microservice dtor is invoked\n")));
 }
 
@@ -1233,7 +1112,7 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
         _dbName.assign(dbName);
     }
 
-    mMongodbc = new Mongodbc(uri, _dbName, _pool);
+    mMongodbc = new Mongodbc(uri, _dbName);
 }
 
 WebServer::~WebServer()
@@ -1388,7 +1267,6 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 
     /* Reclaim the memory now */
     m_req->release();
-    m_req = NULL;
     m_expectedLength = -1;
 
     auto it = m_parent->currentWorker();
@@ -1410,22 +1288,6 @@ ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l WebConnection::handle_close handle %d will be closed upon timer expiry\n"), handle));
-    #if 0
-    if(m_timerId > 0) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Running timer for handle %d is stopped\n"), handle));
-        m_parent->stop_conn_cleanup_timer(m_timerId);
-    }
-
-    auto it = m_parent->connectionPool().find(handle);
-    if(it != std::end(m_parent->connectionPool())) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Entry is removed from connection pool\n")));
-        it = m_parent->connectionPool().erase(it);
-        close(handle);
-    }
-    #endif
-
-    /* hold the fd close till timer is expired , otherwise we may get new connection on that fd.*/
-    //close(handle);
     return(0);
 }
 
@@ -1468,8 +1330,6 @@ bool WebConnection::isBufferingOfRequestCompleted()
 
             std::string pre_process_req((const char*)scratch_pad.data(), len);
             Http http(pre_process_req);
-
-            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D %M %t:%N:%l HTTP HEADER %s\n"), http.header().c_str()));
 
             if(http.header().length()) {
                 std::string CT = http.get_element("Content-Type");

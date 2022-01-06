@@ -78,12 +78,6 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
         }
 
         ACE_INT32 process_request(ACE_HANDLE handle, ACE_Message_Block& mb, Mongodbc& dbInst);
-        ACE_Message_Block* handle_OPTIONS(ACE_Message_Block& in);
-        ACE_Message_Block* handle_GET(ACE_Message_Block& in, Mongodbc& dbInst);
-        ACE_Message_Block* handle_POST(ACE_Message_Block& in, Mongodbc& dbInst);
-        ACE_Message_Block* handle_PUT(ACE_Message_Block& in, Mongodbc& dbInst);
-        ACE_Message_Block* handle_DELETE(ACE_Message_Block& in, Mongodbc& dbInst);
-        /* Function overloading */
         ACE_Message_Block* handle_OPTIONS(std::string& in);
         ACE_Message_Block* handle_GET(std::string& in, Mongodbc& dbInst);
         ACE_Message_Block* handle_POST(std::string& in, Mongodbc& dbInst);
@@ -96,7 +90,6 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
 
     private:
         bool m_continue;
-        ACE_Message_Block* m_mb;
         ACE_thread_t m_threadId;
         bool m_iAmDone;
         
