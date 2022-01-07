@@ -24,17 +24,17 @@
 
 #include "ace/Log_Msg.h"
 
-class Mongodbc {
+class MongodbClient {
     public:
-        Mongodbc(std::string uri, std::string db_name);
-        Mongodbc();
-        ~Mongodbc();
+        MongodbClient(std::string uri);
+        MongodbClient();
+        ~MongodbClient();
 
-        std::string get_dbName() const {
+        std::string get_database() const {
             return(mdbName);
         }
 
-        void set_dbName(std::string dbName) {
+        void set_database(std::string dbName) {
             mdbName = dbName;
         }
 
@@ -44,10 +44,6 @@ class Mongodbc {
 
         void set_uri(std::string uri) {
             mURI = uri;
-        }
-
-        mongocxx::database& get_mongoDbInst() {
-            return(mMongoDbInst);
         }
 
         bool update_collection(std::string coll, std::string filter, std::string document);
@@ -62,10 +58,9 @@ class Mongodbc {
     private:
         std::string mURI;
         std::string mdbName;
-        mongocxx::database mMongoDbInst;
         /* Pool of db connections */
-        mongocxx::pool* mMongoConnPool;
-        mongocxx::instance* mInstance;
+        std::unique_ptr<mongocxx::pool> mMongoConnPool;
+        std::unique_ptr<mongocxx::instance> mInstance;
 };
 
 

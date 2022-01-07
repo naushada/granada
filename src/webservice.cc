@@ -4,7 +4,7 @@
 #include "webservice.h"
 #include "http_parser.h"
 
-ACE_Message_Block* MicroService::handle_DELETE(std::string& in, Mongodbc& dbInst)
+ACE_Message_Block* MicroService::handle_DELETE(std::string& in, MongodbClient& dbInst)
 {
     Http http(in);
 
@@ -58,7 +58,7 @@ ACE_Message_Block* MicroService::handle_DELETE(std::string& in, Mongodbc& dbInst
     return(build_responseERROR(err_message, err));
 }
 
-ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb, Mongodbc& dbInst)
+ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb, MongodbClient& dbInst)
 {
     std::string http_header, http_body;
     http_header.clear();
@@ -140,7 +140,7 @@ std::string MicroService::get_contentType(std::string ext)
     return(cntType);
 }
 
-ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
+ACE_Message_Block* MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
 {
     /* Check for Query string */
     Http http(in);
@@ -199,7 +199,7 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, Mongodbc& dbInst)
     return(build_responseOK(std::string()));
 }
 
-ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
+ACE_Message_Block* MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
 {
     size_t ct_offset = 0, cl_offset = 0;
     /* Check for Query string */
@@ -558,7 +558,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DB Query %s\n"), document.c_str()));
         std::string projection("{\"_id\" : false}");
         std::string record = dbInst.get_documents(collectionName, document, projection);
-        //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo Response %s\n"), record.c_str()));
+
         if(record.length()) {
             return(build_responseOK(record));
         } else {
@@ -691,7 +691,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, Mongodbc& dbInst)
     return(build_responseOK(std::string()));
 }
 
-ACE_Message_Block* MicroService::handle_PUT(std::string& in, Mongodbc& dbInst)
+ACE_Message_Block* MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
 {
     /* Check for Query string */
     Http http(in);
@@ -899,7 +899,7 @@ int MicroService::svc()
                 mb->rd_ptr(sizeof(ACE_HANDLE));
 
                 std::uintptr_t inst = *((std::uintptr_t *)mb->rd_ptr());
-                Mongodbc* dbInst = reinterpret_cast<Mongodbc*>(inst);
+                MongodbClient* dbInst = reinterpret_cast<MongodbClient*>(inst);
                 mb->rd_ptr(sizeof(uintptr_t));
 
                 /* Parent instance */
@@ -907,7 +907,7 @@ int MicroService::svc()
                 WebServer* parent = reinterpret_cast<WebServer*>(parent_inst);
                 mb->rd_ptr(sizeof(uintptr_t));
 
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s dbName %s\n"), dbInst->get_uri().c_str(), dbInst->get_dbName().c_str()));
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s dbName %s\n"), dbInst->get_uri().c_str(), dbInst->get_database().c_str()));
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, mb->length()));
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), mb->length()));
@@ -1112,7 +1112,7 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
         _dbName.assign(dbName);
     }
 
-    mMongodbc = new Mongodbc(uri, _dbName);
+    mMongodbc = new MongodbClient(uri);
 }
 
 WebServer::~WebServer()

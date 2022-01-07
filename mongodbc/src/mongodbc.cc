@@ -6,7 +6,7 @@
 
 #include "mongodbc.h"
 
-Mongodbc::Mongodbc()
+MongodbClient::MongodbClient()
 {
     mInstance = nullptr;
     mURI.clear();
@@ -14,45 +14,46 @@ Mongodbc::Mongodbc()
     mMongoConnPool = nullptr;
 }
 
-Mongodbc::Mongodbc(std::string uri_str, std::string db_name)
+MongodbClient::MongodbClient(std::string uri_str)
 {
     mInstance = nullptr;
     mMongoConnPool = nullptr;
     mURI = uri_str;
-    mdbName = db_name;
 
     do {
 
-        mInstance = new mongocxx::instance();
+        mInstance = std::make_unique<mongocxx::instance>();
         if(nullptr == mInstance) {
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l instantiation of mongocxx::instance is failed\n")));
             break;
         }
 
         /* pool of connections*/
-        std::string poolUri(uri_str);
+        //std::string poolUri(uri_str);
 
         /* reference: http://mongocxx.org/mongocxx-v3/connection-pools/ */
         //poolUri += "/?minPoolSize=10&maxPoolSize=" + std::to_string(poolSize);
         //poolUri += "&minPoolSize=10&maxPoolSize=" + std::to_string(poolSize);
-        //poolUri += "&maxPoolSize=" + std::to_string(poolSize);
+        //poolUri += "&maxPoolSize=" + std::to_string();
 
-        mongocxx::uri uri(poolUri.c_str());
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l The URI is %s\n"), uri_str.c_str()));
+        mongocxx::uri uri(uri_str.c_str());
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l The databse from URI is %s maxPoolSize %d\n"), uri.database().c_str()));
 
-        mMongoConnPool = new mongocxx::pool(uri);
+        mMongoConnPool = std::make_unique<mongocxx::pool>(uri);
         if(nullptr == mMongoConnPool) {
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l instantiation of MongoConnPool is failed\n")));
             break;
         }
 
-    }while(0);
+        set_database(uri.database());
 
+    }while(0);
 }
 
-Mongodbc::~Mongodbc()
+MongodbClient::~MongodbClient()
 {
 
+#if 0
     if(nullptr != mInstance) {
         delete mInstance;
     }
@@ -60,9 +61,10 @@ Mongodbc::~Mongodbc()
     if(nullptr != mMongoConnPool) {
         delete mMongoConnPool;
     }
+#endif
 }
 
-bool Mongodbc::update_collection(std::string collectionName, std::string match, std::string document)
+bool MongodbClient::update_collection(std::string collectionName, std::string match, std::string document)
 {
     bsoncxx::document::value toUpdate = bsoncxx::from_json(document.c_str());
     bsoncxx::document::value filter = bsoncxx::from_json(match.c_str());
@@ -73,7 +75,7 @@ bool Mongodbc::update_collection(std::string collectionName, std::string match, 
         return(false);
     }
 
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(collectionName.c_str());
 
     mongocxx::options::bulk_write bulk_opt;
@@ -99,11 +101,11 @@ bool Mongodbc::update_collection(std::string collectionName, std::string match, 
     }
 }
 
-bool Mongodbc::delete_document(std::string collectionName, std::string doc)
+bool MongodbClient::delete_document(std::string collectionName, std::string doc)
 {
     bsoncxx::document::value filter = bsoncxx::from_json(doc.c_str());
     auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(collectionName.c_str());
 
     mongocxx::options::bulk_write bulk_opt;
@@ -132,12 +134,12 @@ bool Mongodbc::delete_document(std::string collectionName, std::string doc)
     }
 }
 
-std::string Mongodbc::get_document(std::string collectionName, std::string query, std::string fieldProjection)
+std::string MongodbClient::get_document(std::string collectionName, std::string query, std::string fieldProjection)
 {
     std::string json_object;
     bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
     auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(collectionName.c_str());
 
     mongocxx::options::find opts{};
@@ -156,12 +158,12 @@ std::string Mongodbc::get_document(std::string collectionName, std::string query
     return(std::string(bsoncxx::to_json(*iter).c_str()));
 }
 
-std::string Mongodbc::get_documents(std::string collectionName, std::string query, std::string fieldProjection)
+std::string MongodbClient::get_documents(std::string collectionName, std::string query, std::string fieldProjection)
 {
     std::string json_object;
     bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
     auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(collectionName.c_str());
 
     mongocxx::options::find opts{};
@@ -190,12 +192,12 @@ std::string Mongodbc::get_documents(std::string collectionName, std::string quer
     return(std::string(result.str()));
 }
 
-std::string Mongodbc::create_document(std::string collectionName, std::string doc)
+std::string MongodbClient::create_document(std::string collectionName, std::string doc)
 {
     bsoncxx::document::value document = bsoncxx::from_json(doc.c_str());
     
     auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(collectionName.c_str());
     bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(document.view());
 
@@ -209,10 +211,10 @@ std::string Mongodbc::create_document(std::string collectionName, std::string do
     return(std::string());
 }
 
-std::string Mongodbc::get_byOID(std::string coll, std::string projection, std::string oid)
+std::string MongodbClient::get_byOID(std::string coll, std::string projection, std::string oid)
 {
     auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(coll.c_str());
 
     std::string query("{\"_id\" : {\"$oid\": \"");
@@ -238,12 +240,12 @@ std::string Mongodbc::get_byOID(std::string coll, std::string projection, std::s
 
 }
 
-std::string Mongodbc::get_documentList(std::string collectionName, std::string query, std::string fieldProjection)
+std::string MongodbClient::get_documentList(std::string collectionName, std::string query, std::string fieldProjection)
 {
     std::string json_object;
     bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
     auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(collectionName.c_str());
 
     mongocxx::options::find opts{};
@@ -271,7 +273,7 @@ std::string Mongodbc::get_documentList(std::string collectionName, std::string q
     return(std::string(result.str()));
 }
 
-std::int32_t Mongodbc::create_bulk_document(std::string collectionName, std::string doc)
+std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std::string doc)
 {
     mongocxx::options::bulk_write bulk_opt;
     mongocxx::write_concern wc;
@@ -281,7 +283,7 @@ std::int32_t Mongodbc::create_bulk_document(std::string collectionName, std::str
 
     bsoncxx::document::value new_shipment = bsoncxx::from_json(doc.c_str());
     auto conn = mMongoConnPool->acquire();
-    mongocxx::database dbInst = conn->database(get_dbName().c_str());
+    mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(collectionName.c_str());
 
     auto bulk = collection.create_bulk_write(bulk_opt);
@@ -307,7 +309,7 @@ std::int32_t Mongodbc::create_bulk_document(std::string collectionName, std::str
 }
 
 /*
-std::int32_t Mongodbc::update_bulk_shipment(std::string bulkShipment)
+std::int32_t MongodbClient::update_bulk_shipment(std::string bulkShipment)
 {
 
 }

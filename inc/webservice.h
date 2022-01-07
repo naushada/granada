@@ -77,12 +77,12 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
           return(ACE_Thread_Manager::ACE_THR_RUNNING == st);
         }
 
-        ACE_INT32 process_request(ACE_HANDLE handle, ACE_Message_Block& mb, Mongodbc& dbInst);
+        ACE_INT32 process_request(ACE_HANDLE handle, ACE_Message_Block& mb, MongodbClient& dbInst);
         ACE_Message_Block* handle_OPTIONS(std::string& in);
-        ACE_Message_Block* handle_GET(std::string& in, Mongodbc& dbInst);
-        ACE_Message_Block* handle_POST(std::string& in, Mongodbc& dbInst);
-        ACE_Message_Block* handle_PUT(std::string& in, Mongodbc& dbInst);
-        ACE_Message_Block* handle_DELETE(std::string& in, Mongodbc& dbInst);
+        ACE_Message_Block* handle_GET(std::string& in, MongodbClient& dbInst);
+        ACE_Message_Block* handle_POST(std::string& in, MongodbClient& dbInst);
+        ACE_Message_Block* handle_PUT(std::string& in, MongodbClient& dbInst);
+        ACE_Message_Block* handle_DELETE(std::string& in, MongodbClient& dbInst);
         ACE_Message_Block* build_responseOK(std::string http_body, std::string content_type="application/json");
         ACE_Message_Block* build_responseCreated();
         std::string get_contentType(std::string _ext);
@@ -183,7 +183,7 @@ class WebServer : public ACE_Event_Handler {
             return(curr);
         }
 
-        Mongodbc* mongodbcInst() {
+        MongodbClient* mongodbcInst() {
             return(mMongodbc);
         }
     private:
@@ -196,7 +196,7 @@ class WebServer : public ACE_Event_Handler {
         std::vector<MicroService*> m_workerPool;
         std::vector<MicroService*>::iterator m_currentWorker;
         /* mongo db interface */
-        Mongodbc* mMongodbc;
+        MongodbClient* mMongodbc;
 
 };
 
