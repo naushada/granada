@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
 
    cmdOpt.fill("");
 
-   ACE_LOG_MSG->open (argv[0]);
+   ACE_LOG_MSG->open (argv[0], ACE_LOG_MSG->STDERR|ACE_LOG_MSG->SYSLOG);
 
    /* The last argument tells from where to start in argv - offset of argv array */
    ACE_Get_Opt opts (argc, argv, ACE_TEXT ("s:p:w:u:c:h:d:"), 1);

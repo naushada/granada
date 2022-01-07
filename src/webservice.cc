@@ -535,11 +535,12 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, MongodbClient& dbIn
             auto end = accCode.find(delim);
             while (end != std::string::npos)
             {
-                lst += "\"" + accCode.substr(start, end - start) + "\"" + delim;
+                //lst += "\"" + accCode.substr(start, end - start) + "\"" + delim;
+                lst += accCode.substr(start, end - start)  + delim;
                 start = end + delim.length();
                 end = accCode.find(delim, start);
             }
-            lst += "\"" + accCode.substr(start) + "\"";
+            lst +=  accCode.substr(start);
             lst += "]";
 
             document = "{\"accountCode\" : {\"$in\" : " +
