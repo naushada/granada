@@ -53,6 +53,9 @@ MongodbClient::MongodbClient(std::string uri_str)
 MongodbClient::~MongodbClient()
 {
 
+    mInstance.reset(nullptr);
+    mMongoConnPool.reset(nullptr);
+
 #if 0
     if(nullptr != mInstance) {
         delete mInstance;
@@ -99,6 +102,8 @@ bool MongodbClient::update_collection(std::string collectionName, std::string ma
         }
         return(true);
     }
+
+    return(false);
 }
 
 bool MongodbClient::delete_document(std::string collectionName, std::string doc)
@@ -162,7 +167,7 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
 {
     std::string json_object;
     bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
-    auto conn = mMongoConnPool->acquire();
+    mongocxx::pool::entry conn = mMongoConnPool->acquire();
     mongocxx::database dbInst = conn->database(get_database().c_str());
     auto collection = dbInst.collection(collectionName.c_str());
 
@@ -170,9 +175,10 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
     bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
     auto resultFormat = opts.projection(outputProjection);
     mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
-    mongocxx::cursor::iterator iter = cursor.begin();
+    auto _cursor = std::move(cursor);
+    mongocxx::cursor::iterator iter = _cursor.begin();
 
-    if(iter == cursor.end()) {
+    if(iter == _cursor.end()) {
         conn = nullptr;
         return(std::string());
     }
@@ -180,7 +186,7 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
     std::stringstream result("");
     result << "[";
 
-    for(; iter != cursor.end(); ++iter) {
+    for(; iter != _cursor.end(); ++iter) {
         result << bsoncxx::to_json(*iter).c_str()
                << ",";
     }
@@ -251,8 +257,9 @@ std::string MongodbClient::get_documentList(std::string collectionName, std::str
     mongocxx::options::find opts{};
     bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
     auto resultFormat = opts.projection(outputProjection);
-    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
-    bsoncxx::document::view res = *cursor.begin();
+    mongocxx::v_noabi::cursor _cursor = collection.find(filter.view(), resultFormat);
+    auto cursor = std::move(_cursor);
+    //bsoncxx::document::view res = *cursor.begin();
     mongocxx::cursor::iterator iter = cursor.begin();
 
     if(iter == cursor.end()) {
