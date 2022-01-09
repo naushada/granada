@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <mutex>
+#include <chrono>
 
 #include <bsoncxx/json.hpp>
 #include <bsoncxx/types.hpp>

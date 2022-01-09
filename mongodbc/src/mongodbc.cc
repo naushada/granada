@@ -110,7 +110,17 @@ bool MongodbClient::delete_document(std::string collectionName, std::string doc)
 {
     bsoncxx::document::value filter = bsoncxx::from_json(doc.c_str());
     auto conn = mMongoConnPool->acquire();
+
+    if(!conn) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        return(false);
+    }
+
     mongocxx::database dbInst = conn->database(get_database().c_str());
+    if(!dbInst) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for database %s\n"), collectionName.c_str()));
+        return(false);
+    }
     auto collection = dbInst.collection(collectionName.c_str());
 
     mongocxx::options::bulk_write bulk_opt;
@@ -144,13 +154,25 @@ std::string MongodbClient::get_document(std::string collectionName, std::string 
     std::string json_object;
     bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
     auto conn = mMongoConnPool->acquire();
+    if(!conn) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
     mongocxx::database dbInst = conn->database(get_database().c_str());
+    if(!dbInst) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
     auto collection = dbInst.collection(collectionName.c_str());
 
     mongocxx::options::find opts{};
+    using namespace std::literals::chrono_literals;
+    std::chrono::milliseconds ms = 5s;
     bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
-    auto resultFormat = opts.projection(outputProjection);
-    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
+    opts.max_time(ms).no_cursor_timeout(false).projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), opts);
 
     mongocxx::cursor::iterator iter = cursor.begin();
 
@@ -167,18 +189,32 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
 {
     std::string json_object;
     bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
+
     mongocxx::pool::entry conn = mMongoConnPool->acquire();
+    if(!conn) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
     mongocxx::database dbInst = conn->database(get_database().c_str());
+    if(!dbInst) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
     auto collection = dbInst.collection(collectionName.c_str());
 
-    mongocxx::options::find opts{};
     bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
-    auto resultFormat = opts.projection(outputProjection);
-    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), resultFormat);
-    auto _cursor = std::move(cursor);
-    mongocxx::cursor::iterator iter = _cursor.begin();
 
-    if(iter == _cursor.end()) {
+    using namespace std::literals::chrono_literals;
+    mongocxx::options::find opts{};
+    std::chrono::milliseconds ms = 5s;
+
+    opts.max_time(ms).no_cursor_timeout(false).projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), opts);
+    mongocxx::cursor::iterator iter = cursor.begin();
+
+    if(iter == cursor.end()) {
         conn = nullptr;
         return(std::string());
     }
@@ -186,7 +222,7 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
     std::stringstream result("");
     result << "[";
 
-    for(; iter != _cursor.end(); ++iter) {
+    for(; iter != cursor.end(); ++iter) {
         result << bsoncxx::to_json(*iter).c_str()
                << ",";
     }
@@ -203,7 +239,17 @@ std::string MongodbClient::create_document(std::string collectionName, std::stri
     bsoncxx::document::value document = bsoncxx::from_json(doc.c_str());
     
     auto conn = mMongoConnPool->acquire();
+    if(!conn) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
     mongocxx::database dbInst = conn->database(get_database().c_str());
+    if(!dbInst) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
     auto collection = dbInst.collection(collectionName.c_str());
     bsoncxx::stdx::optional<mongocxx::result::insert_one> result = collection.insert_one(document.view());
 
@@ -251,15 +297,25 @@ std::string MongodbClient::get_documentList(std::string collectionName, std::str
     std::string json_object;
     bsoncxx::document::value filter = bsoncxx::from_json(query.c_str());
     auto conn = mMongoConnPool->acquire();
+    if(!conn) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
     mongocxx::database dbInst = conn->database(get_database().c_str());
+    if(!dbInst) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for database %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
     auto collection = dbInst.collection(collectionName.c_str());
 
+    using namespace std::literals::chrono_literals;
+    std::chrono::milliseconds ms = 5s;
     mongocxx::options::find opts{};
     bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(fieldProjection.c_str());
-    auto resultFormat = opts.projection(outputProjection);
-    mongocxx::v_noabi::cursor _cursor = collection.find(filter.view(), resultFormat);
-    auto cursor = std::move(_cursor);
-    //bsoncxx::document::view res = *cursor.begin();
+    opts.max_time(ms).no_cursor_timeout(false).projection(outputProjection);
+    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), opts);
     mongocxx::cursor::iterator iter = cursor.begin();
 
     if(iter == cursor.end()) {
@@ -282,6 +338,7 @@ std::string MongodbClient::get_documentList(std::string collectionName, std::str
 
 std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std::string doc)
 {
+    std::int32_t cnt = 0;
     mongocxx::options::bulk_write bulk_opt;
     mongocxx::write_concern wc;
     bulk_opt.ordered(false);
@@ -290,7 +347,17 @@ std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std
 
     bsoncxx::document::value new_shipment = bsoncxx::from_json(doc.c_str());
     auto conn = mMongoConnPool->acquire();
+    if(!conn) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        return(cnt);
+    }
+
     mongocxx::database dbInst = conn->database(get_database().c_str());
+    if(!dbInst) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for database %s\n"), collectionName.c_str()));
+        return(cnt);
+    }
+
     auto collection = dbInst.collection(collectionName.c_str());
 
     auto bulk = collection.create_bulk_write(bulk_opt);
@@ -305,7 +372,6 @@ std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std
     }
 
     auto result = bulk.execute();
-    std::int32_t cnt = 0;
 
     if(result) {
         cnt = result->inserted_count();

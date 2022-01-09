@@ -600,7 +600,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, MongodbClient& dbIn
             return(build_responseERROR(err_message, err));
         }
 
-    } else if((!uri.compare(0, 6, "/bayt/"))) {
+    } else if((!uri.compare(0, 7, "/webui/"))) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
         /* build the file name now */
         std::string fileName("");
@@ -652,7 +652,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, MongodbClient& dbIn
           }
         }
 
-    } else if((!uri.compare(0, 6, "/bayt/"))) {
+    } else if((!uri.compare(0, 7, "/webui/"))) {
         std::string newFile = "../webgui/ui/index.html";
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s \n"), newFile.c_str()));
         /* Open the index.html file and send it to web browser. */
