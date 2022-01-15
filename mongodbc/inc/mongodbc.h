@@ -48,13 +48,20 @@ class MongodbClient {
         }
 
         bool update_collection(std::string coll, std::string filter, std::string document);
+        bool update_collectionEx(std::string coll, std::string filter, std::string document);
         bool delete_document(std::string coll, std::string shippingRecord);
+        bool delete_documentEx(std::string coll, std::string shippingRecord);
         std::string create_document(std::string coll, std::string accountRecord);
+        std::string create_documentEx(std::string coll, std::string accountRecord);
         std::string get_document(std::string collectionName, std::string query, std::string fieldProjection);
         std::string get_documents(std::string collectionName, std::string query, std::string fieldProjection);
+        std::string get_documentEx(std::string collectionName, std::string query, std::string fieldProjection);
+        std::string get_documentsEx(std::string collectionName, std::string query, std::string fieldProjection);
         std::string get_byOID(std::string collection, std::string projection, std::string oid);
         std::string get_documentList(std::string collectionName, std::string query, std::string fieldProjection);
         std::int32_t create_bulk_document(std::string coll, std::string doc);
+        std::string get_documentListEx(std::string collectionName, std::string query, std::string fieldProjection);
+        std::int32_t create_bulk_documentEx(std::string coll, std::string doc);
 
     private:
         std::string mURI;

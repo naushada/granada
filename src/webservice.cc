@@ -914,6 +914,7 @@ int MicroService::svc()
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), mb->length()));
                 /*! Process The Request */
                 process_request(handle, *mb, *dbInst);
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l mb->reference_count() %d \n"), mb->reference_count()));
                 mb->release();
                 break;
             }
@@ -1267,6 +1268,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     req->wr_ptr(len);
 
     /* Reclaim the memory now */
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
     m_req->release();
     m_expectedLength = -1;
 
