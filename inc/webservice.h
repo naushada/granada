@@ -184,7 +184,7 @@ class WebServer : public ACE_Event_Handler {
         }
 
         MongodbClient* mongodbcInst() {
-            return(mMongodbc);
+            return(mMongodbc.get());
         }
     private:
         ACE_Message_Block m_mb;
@@ -196,7 +196,7 @@ class WebServer : public ACE_Event_Handler {
         std::vector<MicroService*> m_workerPool;
         std::vector<MicroService*>::iterator m_currentWorker;
         /* mongo db interface */
-        MongodbClient* mMongodbc;
+        std::unique_ptr<MongodbClient> mMongodbc;
 
 };
 
