@@ -29,7 +29,7 @@ Http::Http(const std::string& in)
 
 Http::~Http()
 {
-
+  m_tokenMap.clear();
 }
 
 void Http::parse_uri(const std::string& in)

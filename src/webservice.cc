@@ -196,6 +196,70 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, MongodbClient& dbI
                 return(build_responseERROR(err_message, err));
             }
         }
+    } else if(!uri.compare("/api/vendor/v1/ajoul/authorize")) {
+        std::string header;
+        header = "Connection: close\r\n"
+                 "Cache-Control: no-cache\r\n"
+                 "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n";
+
+        std::string apiAuthorizeAjoul = "";
+        apiAuthorizeAjoul="------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                    "Content-Disposition: form-data; name=\"client_secret\"\r\n"
+                    "\r\nuCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n"
+                    "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                    "Content-Disposition: form-data; name=\"client_id\"\r\n"
+                    "\r\n34\r\n"
+                    "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                    "Content-Disposition: form-data; name=\"username\"\r\n"
+                    "\r\nAKjHYuCAco\r\n"
+                    "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                    "Content-Disposition: form-data; name=\"password\"\r\n"
+                    "\r\nuCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n"
+                    "------WebKitFormBoundary7MA4YWxkTrZu0gW--";
+
+        std::string apiURLAjoul = "https://ajoul.com/remote/api/v1/authorize";
+        ACE_SSL_SOCK_Connector client;
+        ACE_SSL_SOCK_Stream conn;
+        ACE_INET_Addr connectAddr("ajoul.com:443");
+        ACE_Time_Value to(2,0);
+
+        if(client.connect(conn, connectAddr, to) < 0) {
+
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l connect to ajoul:443 is failed\n")));
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"https://ajoul.com is not rechable\", \"errorCode\" : 400}");
+            return(build_responseERROR(err_message, err));
+
+        } else {
+
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Connect to https://ajoul.com is success\n")));
+            std::string httpReq = "POST /remote/api/v1/authorize HTTP/1.1\r\n" + header + "\r\n" + apiAuthorizeAjoul;
+            if(conn.send(httpReq.c_str(), httpReq.length()) < 0) {
+
+                ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l send to ajoul:443 is failed\n")));
+                std::string err("400 Bad Request");
+                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"https://ajoul.com is not responding\", \"errorCode\" : 400}");
+                return(build_responseERROR(err_message, err));
+
+            } else {
+
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Sent to https://ajoul.com is success\n")));
+                std::string rsp("");
+                ssize_t len = conn.recv((void *)rsp.data(), 1024, 0);
+
+                if(len < 0) {
+                    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l recv from ajoul:443 is failed\n")));
+                    std::string err("400 Bad Request");
+                    std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"https://ajoul.com is not responding to Authorize req\", \"errorCode\" : 400}");
+                    return(build_responseERROR(err_message, err));
+
+                } else {
+
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Response is - %s\n"), rsp.c_str()));
+                    return(build_responseOK(rsp));
+                }
+            }
+        }
     } 
     return(build_responseOK(std::string()));
 }
@@ -985,6 +1049,7 @@ ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
         m_connectionPool.erase(conIt);
         /* let the reactor call handle_close on this handle */
         ACE_Reactor::instance()->remove_handler(_handle, ACE_Event_Handler::READ_MASK | ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK);
+        stop_conn_cleanup_timer(connEnt->timerId());
         /* reclaim the heap memory */
         delete connEnt;
         close(_handle);
@@ -1032,8 +1097,8 @@ ACE_INT32 WebServer::handle_input(ACE_HANDLE handle)
 
 ACE_INT32 WebServer::handle_signal(int signum, siginfo_t* s, ucontext_t* ctx)
 {
-    (void)s;
-    (void)ctx;
+    ACE_UNUSED_ARG(s);
+    ACE_UNUSED_ARG(ctx);
 
     ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Signal Number %d and its name %S is received for WebServer\n"), signum, signum));
 
@@ -1061,8 +1126,8 @@ ACE_INT32 WebServer::handle_signal(int signum, siginfo_t* s, ucontext_t* ctx)
 
 ACE_INT32 WebServer::handle_close(ACE_HANDLE handle, ACE_Reactor_Mask mask)
 {
-    (void)handle;
-    (void)mask;
+    ACE_UNUSED_ARG(handle);
+    ACE_UNUSED_ARG(mask);
     return(0);
 }
 
@@ -1094,7 +1159,8 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
 
     int reuse_addr = 1;
     if(m_server.open(m_listen, reuse_addr)) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Starting of WebServer failed - opening of port %d hostname %s\n"), m_listen.get_port_number(), m_listen.get_host_name()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Starting of WebServer failed - opening of port %d hostname %s\n"), 
+                m_listen.get_port_number(), m_listen.get_host_name()));
     }
 
     /* Mongo DB interface */

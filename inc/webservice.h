@@ -22,6 +22,10 @@
 #include "ace/Thread_Manager.h"
 #include "ace/Get_Opt.h"
 #include "ace/Signal.h"
+#include "ace/SSL/SSL_SOCK.h"
+#include "ace/SSL/SSL_SOCK_Stream.h"
+#include "ace/SSL/SSL_SOCK_Connector.h"
+
 
 #include "mongodbc.h"
 
