@@ -223,7 +223,7 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, MongodbClient& dbI
         ACE_INET_Addr connectAddr("ajoul.com:443");
         ACE_Time_Value to(2,0);
 
-        if(client.connect(conn, connectAddr, to) < 0) {
+        if(client.connect(conn, connectAddr, &to) < 0) {
 
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l connect to ajoul:443 is failed\n")));
             std::string err("400 Bad Request");
