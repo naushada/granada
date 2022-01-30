@@ -10,6 +10,8 @@ include_directories(mongodbc/inc)
 
 include_directories(inc)
 include_directories(/usr/local/ACE_TAO-7.0.0/include)
+include_directories(/usr/local/openssl-1.1.1-stable/include)
+
 link_directories(/usr/local/ACE_TAO-7.0.0/lib)
 link_directories(/usr/local/openssl-1.1.1-stable/lib)
 

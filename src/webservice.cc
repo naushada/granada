@@ -1168,6 +1168,8 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
     std::string _dbName("bayt");
     std::uint32_t _pool = 50;
 
+    ACE_UNUSED_ARG(_pool);
+    
     if(dbUri.length()) {
         uri.assign(dbUri);
     }
