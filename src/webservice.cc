@@ -817,7 +817,7 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, MongodbClient& dbIn
 
 ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
 {
-    (void)in;
+    ACE_UNUSED_ARG(in);
     std::string http_header;
     http_header = "HTTP/1.1 200 OK\r\n";
     http_header += "Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE\r\n";
@@ -921,8 +921,8 @@ ACE_Message_Block* MicroService::build_responseERROR(std::string httpBody, std::
 
 ACE_INT32 MicroService::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 {
-    (void)s;
-    (void)u;
+    ACE_UNUSED_ARG(s);
+    ACE_UNUSED_ARG(u);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service gets signal %d\n"), signum));
     m_continue = false;
 
@@ -931,7 +931,7 @@ ACE_INT32 MicroService::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 
 int MicroService::open(void *arg)
 {
-    (void)arg;
+    ACE_UNUSED_ARG(arg);
     /*! Number of threads are 5, which is 2nd argument. */
     activate();
     return(0);
@@ -939,7 +939,7 @@ int MicroService::open(void *arg)
 
 int MicroService::close(u_long flag)
 {
-    (void)flag;
+    ACE_UNUSED_ARG(flag);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is closing\n")));
     return(0);
 }
@@ -976,7 +976,8 @@ int MicroService::svc()
                 WebServer* parent = reinterpret_cast<WebServer*>(parent_inst);
                 mb->rd_ptr(sizeof(uintptr_t));
 
-                (void)parent;
+                ACE_UNUSED_ARG(parent);
+
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l URI %s dbName %s\n"), dbInst->get_uri().c_str(), dbInst->get_database().c_str()));
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, mb->length()));
 
@@ -985,13 +986,14 @@ int MicroService::svc()
                 process_request(handle, *mb, *dbInst);
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l mb->reference_count() %d \n"), mb->reference_count()));
                 mb->release();
+		mb = nullptr;
                 break;
             }
             case ACE_Message_Block::MB_PCSIG:
                 {
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Got MB_PCSIG \n")));
                     m_continue = false;
-                    if(mb != NULL) {
+                    if(mb != nullptr) {
                         mb->release();
                     }
                     msg_queue()->deactivate();
@@ -1039,9 +1041,10 @@ MicroService::~MicroService()
 
 ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
 {
-    (void)tv;
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebServer::handle_timedout\n")));
+    ACE_UNUSED_ARG(tv);
     std::uintptr_t _handle = reinterpret_cast<std::uintptr_t>(act);
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebServer::handle_timedout for connection %d\n"), _handle));
     auto conIt = m_connectionPool.find(_handle);
 
     if(conIt != std::end(m_connectionPool)) {
@@ -1103,9 +1106,9 @@ ACE_INT32 WebServer::handle_signal(int signum, siginfo_t* s, ucontext_t* ctx)
     ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Signal Number %d and its name %S is received for WebServer\n"), signum, signum));
 
     if(!workerPool().empty()) {
-        std::for_each(workerPool().begin(), workerPool().end(), [&](MicroService* ms) {
+        std::for_each(workerPool().begin(), workerPool().end(), [&](MicroService* ms) ->void {
             ACE_Message_Block* req = nullptr;
-            ACE_NEW_RETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1KB), -1);
+            ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1KB));
             req->msg_type(ACE_Message_Block::MB_PCSIG);
             ms->putq(req);
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Sending to Worker Node\n")));
@@ -1121,6 +1124,7 @@ ACE_INT32 WebServer::handle_signal(int signum, siginfo_t* s, ucontext_t* ctx)
       }
       connectionPool().clear();
     }
+
     return(0);
 }
 
@@ -1353,6 +1357,8 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     /* Reclaim the memory now */
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
     m_req->release();
+    m_req = nullptr;
+
     m_expectedLength = -1;
 
     auto it = m_parent->currentWorker();

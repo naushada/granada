@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.9)
+cmake_minimum_required(VERSION 3.16.3)
 project(microservice)
 
 add_subdirectory(mongodbc)
@@ -25,5 +25,6 @@ add_executable(uniservice ${SOURCES})
 target_link_libraries(uniservice pthread)
 target_link_libraries(uniservice ACE)
 target_link_libraries(uniservice ACE_SSL)
-target_link_libraries(uniservice ssl)
+target_link_libraries(uniservice libssl.a libcrypto.a dl)
+#target_link_libraries(uniservice libcrypto.a)
 target_link_libraries(uniservice mongodbcxx)
