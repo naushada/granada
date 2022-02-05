@@ -22,7 +22,7 @@ MongodbClient::MongodbClient(std::string uri_str)
 
     do {
 
-        mInstance = std::make_unique<mongocxx::instance>();
+        mInstance = std::make_unique<mongocxx::v_noabi::instance>();
         if(nullptr == mInstance) {
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l instantiation of mongocxx::instance is failed\n")));
             break;
@@ -98,14 +98,11 @@ bool MongodbClient::update_collection(std::string collectionName, std::string ma
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l bulk document updated is %d\n"), cnt));
         if(!cnt) {
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Shipment Update is failed\n")));
-            conn = nullptr;
             return(false);
         }
-        conn = nullptr;
         return(true);
     }
     
-    conn = nullptr;
     return(false);
 }
 
@@ -122,7 +119,6 @@ bool MongodbClient::delete_document(std::string collectionName, std::string doc)
     mongocxx::database dbInst = conn->database(get_database().c_str());
     if(!dbInst) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for database %s\n"), collectionName.c_str()));
-        conn = nullptr;
         return(false);
     }
     auto collection = dbInst.collection(collectionName.c_str());
@@ -145,7 +141,6 @@ bool MongodbClient::delete_document(std::string collectionName, std::string doc)
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l bulk document deleted is %d\n"), cnt));
     }
 
-    conn = nullptr;
     if(result) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The shipment from collection is deleted \n")));
         return(true);
@@ -169,7 +164,6 @@ std::string MongodbClient::get_document(std::string collectionName, std::string 
 
     if(!dbInst) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse %s\n"), collectionName.c_str()));
-        conn = nullptr;
         return(std::string());
     }
 
@@ -188,11 +182,9 @@ std::string MongodbClient::get_document(std::string collectionName, std::string 
     mongocxx::cursor::iterator iter = cursor.begin();
 
     if(iter == cursor.end()) {
-        conn = nullptr;
         return(std::string());
     }
 
-    conn = nullptr;
     return(std::string(bsoncxx::to_json(*iter).c_str()));
 }
 
@@ -210,7 +202,6 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
     mongocxx::database dbInst = conn->database(get_database().c_str());
     if(!dbInst) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse %s\n"), collectionName.c_str()));
-        conn = nullptr;
         return(std::string());
     }
 
@@ -224,11 +215,10 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
 
     opts.max_time(ms).no_cursor_timeout(false).projection(outputProjection);
 
-    mongocxx::v_noabi::cursor cursor = collection.find(filter.view(), opts);
+    mongocxx::cursor cursor = collection.find(filter.view(), opts);
     mongocxx::cursor::iterator iter = cursor.begin();
 
     if(iter == cursor.end()) {
-        conn = nullptr;
         return(std::string());
     }
 
@@ -243,7 +233,6 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
     result.seekp(-1, std::ios_base::end);
     result << "]";
 
-    conn = nullptr;
     return(std::string(result.str()));
 }
 
@@ -260,7 +249,6 @@ std::string MongodbClient::create_document(std::string collectionName, std::stri
     mongocxx::database dbInst = conn->database(get_database().c_str());
     if(!dbInst) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse %s\n"), collectionName.c_str()));
-        conn = nullptr;
         return(std::string());
     }
 
@@ -271,11 +259,9 @@ std::string MongodbClient::create_document(std::string collectionName, std::stri
         bsoncxx::oid oid = result->inserted_id().get_oid().value;
         std::string JobID = oid.to_string();
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid is %s\n"), JobID.c_str()));
-        conn = nullptr;
         return(JobID);
     }
 
-    conn = nullptr;
     return(std::string());
 }
 
@@ -298,14 +284,12 @@ std::string MongodbClient::get_byOID(std::string coll, std::string projection, s
     bsoncxx::document::view res = *cursor.begin();
 
     if(iter == cursor.end()) {
-        conn = nullptr;
         return(std::string());
     }
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The Response is %s \n"), bsoncxx::to_json(res).c_str()));
 
     std::stringstream rsp("");
     rsp << bsoncxx::to_json(*iter);
-    conn = nullptr;
     return(rsp.str());
 
 }
@@ -323,7 +307,6 @@ std::string MongodbClient::get_documentList(std::string collectionName, std::str
     mongocxx::database dbInst = conn->database(get_database().c_str());
     if(!dbInst) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for database %s\n"), collectionName.c_str()));
-        conn = nullptr;
         return(std::string());
     }
 
@@ -338,7 +321,6 @@ std::string MongodbClient::get_documentList(std::string collectionName, std::str
     mongocxx::cursor::iterator iter = cursor.begin();
 
     if(iter == cursor.end()) {
-        conn = nullptr;
         return(std::string());
     }
 
@@ -351,7 +333,6 @@ std::string MongodbClient::get_documentList(std::string collectionName, std::str
     }
     result.seekp(-1, std::ios_base::end);
     result << "]";
-    conn = nullptr;
     return(std::string(result.str()));
 }
 
@@ -374,7 +355,6 @@ std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std
     mongocxx::database dbInst = conn->database(get_database().c_str());
     if(!dbInst) {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for database %s\n"), collectionName.c_str()));
-        conn = nullptr;
         return(cnt);
     }
 
@@ -398,7 +378,6 @@ std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l bulk document created is %d\n"), cnt));
     }
 
-    conn = nullptr;
     return(cnt);
 }
 

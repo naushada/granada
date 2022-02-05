@@ -81,16 +81,16 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
           return(ACE_Thread_Manager::ACE_THR_RUNNING == st);
         }
 
-        ACE_INT32 process_request(ACE_HANDLE handle, ACE_Message_Block& mb, MongodbClient& dbInst);
-        ACE_Message_Block* handle_OPTIONS(std::string& in);
-        ACE_Message_Block* handle_GET(std::string& in, MongodbClient& dbInst);
-        ACE_Message_Block* handle_POST(std::string& in, MongodbClient& dbInst);
-        ACE_Message_Block* handle_PUT(std::string& in, MongodbClient& dbInst);
-        ACE_Message_Block* handle_DELETE(std::string& in, MongodbClient& dbInst);
-        ACE_Message_Block* build_responseOK(std::string http_body, std::string content_type="application/json");
-        ACE_Message_Block* build_responseCreated();
+        std::int32_t process_request(ACE_HANDLE handle, ACE_Message_Block& mb, MongodbClient& dbInst);
+        std::string handle_OPTIONS(std::string& in);
+        std::string handle_GET(std::string& in, MongodbClient& dbInst);
+        std::string handle_POST(std::string& in, MongodbClient& dbInst);
+        std::string handle_PUT(std::string& in, MongodbClient& dbInst);
+        std::string handle_DELETE(std::string& in, MongodbClient& dbInst);
+        std::string build_responseOK(std::string http_body, std::string content_type="application/json");
+        std::string build_responseCreated();
         std::string get_contentType(std::string _ext);
-        ACE_Message_Block* build_responseERROR(std::string httpBody, std::string error);
+        std::string build_responseERROR(std::string httpBody, std::string error);
 
     private:
         bool m_continue;

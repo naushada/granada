@@ -4,7 +4,7 @@
 #include "webservice.h"
 #include "http_parser.h"
 
-ACE_Message_Block* MicroService::handle_DELETE(std::string& in, MongodbClient& dbInst)
+std::string MicroService::handle_DELETE(std::string& in, MongodbClient& dbInst)
 {
     Http http(in);
 
@@ -58,12 +58,12 @@ ACE_Message_Block* MicroService::handle_DELETE(std::string& in, MongodbClient& d
     return(build_responseERROR(err_message, err));
 }
 
-ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb, MongodbClient& dbInst)
+std::int32_t MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb, MongodbClient& dbInst)
 {
     std::string http_header, http_body;
     http_header.clear();
     http_body.clear();
-    ACE_Message_Block* rsp = nullptr;
+    std::string rsp;
 
     std::string req(mb.rd_ptr(), mb.length());
 
@@ -82,24 +82,20 @@ ACE_INT32 MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block& mb
     }
 
     std::int32_t ret = 0;
-    if(nullptr != rsp) {
-
-      std::string response(rsp->rd_ptr(), rsp->length());
-      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the reference_count is %d\n"), rsp->reference_count()));
-      /** reclaim the memory now*/
-      rsp->release();
-      std::int32_t  toBeSent = response.length();
-      std::int32_t offset = 0;
-      do {
-        ret = send(handle, (response.c_str() + offset), (toBeSent - offset), 0);
-        if(ret < 0) {
-          ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l sent to peer is failed\n")));
-          break;
-        }
-        offset += ret;
-        ret = 0;
-      } while((toBeSent != offset));
-    }
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the response length is %d\n"), rsp.length()));
+    
+    std::int32_t  toBeSent = rsp.length();
+    std::int32_t offset = 0;
+    do {
+      ret = send(handle, (rsp.c_str() + offset), (toBeSent - offset), 0);
+      if(ret < 0) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l sent to peer is failed\n")));
+        break;
+      }
+      offset += ret;
+      ret = 0;
+    } while((toBeSent != offset));
+    
     return(ret);
 }
 
@@ -141,7 +137,7 @@ std::string MicroService::get_contentType(std::string ext)
     return(cntType);
 }
 
-ACE_Message_Block* MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
+std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
 {
     /* Check for Query string */
     Http http(in);
@@ -264,7 +260,7 @@ ACE_Message_Block* MicroService::handle_POST(std::string& in, MongodbClient& dbI
     return(build_responseOK(std::string()));
 }
 
-ACE_Message_Block* MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
+std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
 {
     /* Check for Query string */
     Http http(in);
@@ -756,7 +752,7 @@ ACE_Message_Block* MicroService::handle_GET(std::string& in, MongodbClient& dbIn
     return(build_responseOK(std::string()));
 }
 
-ACE_Message_Block* MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
+std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
 {
     /* Check for Query string */
     Http http(in);
@@ -815,7 +811,7 @@ ACE_Message_Block* MicroService::handle_PUT(std::string& in, MongodbClient& dbIn
     return(build_responseOK(std::string()));
 }
 
-ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
+std::string MicroService::handle_OPTIONS(std::string& in)
 {
     ACE_UNUSED_ARG(in);
     std::string http_header;
@@ -827,18 +823,18 @@ ACE_Message_Block* MicroService::handle_OPTIONS(std::string& in)
     http_header += "Content-Type: text/plain; charset=utf-8\r\n";
     http_header += "Content-Length: 0\r\n";
     http_header += "\r\n\r\n";
-    ACE_Message_Block* rsp = nullptr;
+   // ACE_Message_Block* rsp = nullptr;
 
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(512), nullptr);
+    //ACE_NEW_RETURN(rsp, ACE_Message_Block(512), nullptr);
 
-    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    rsp->wr_ptr(http_header.length());
+    //std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
+    //rsp->wr_ptr(http_header.length());
 
     //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
-    return(rsp);
+    return(http_header);
 }
 
-ACE_Message_Block* MicroService::build_responseCreated()
+std::string MicroService::build_responseCreated()
 {
     std::string http_header;
     ACE_Message_Block* rsp = nullptr;
@@ -848,19 +844,20 @@ ACE_Message_Block* MicroService::build_responseCreated()
     http_header += "Access-Control-Allow-Origin: *\r\n";
     http_header += "Content-Length: 0\r\n";
 
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
+    //ACE_NEW_RETURN(rsp, ACE_Message_Block(256), nullptr);
 
-    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    rsp->wr_ptr(http_header.length());
+    //std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
+    //rsp->wr_ptr(http_header.length());
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response %s \n"), http_header.length(), http_header.c_str()));
-    return(rsp);
+    return(http_header);
 }
 
-ACE_Message_Block* MicroService::build_responseOK(std::string httpBody, std::string contentType)
+std::string MicroService::build_responseOK(std::string httpBody, std::string contentType)
 {
     std::string http_header;
-    ACE_Message_Block* rsp = nullptr;
+    //ACE_Message_Block* rsp = nullptr;
+    std::string rsp;
 
     http_header = "HTTP/1.1 200 OK\r\n";
     http_header += "Connection: keep-alive\r\n";
@@ -875,24 +872,25 @@ ACE_Message_Block* MicroService::build_responseOK(std::string httpBody, std::str
         http_header += "Content-Length: 0\r\n";
     }
 
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1KB) + httpBody.length()), nullptr);
+    //ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1KB) + httpBody.length()), nullptr);
 
-    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    rsp->wr_ptr(http_header.length());
+    //std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
+    //rsp->wr_ptr(http_header.length());
+    rsp = http_header;
 
     if(httpBody.length()) {
-        std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
-        rsp->wr_ptr(httpBody.length());
+        //std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
+        //rsp->wr_ptr(httpBody.length());
+        rsp += httpBody;
     }
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response header\n%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
     return(rsp);
 }
 
-ACE_Message_Block* MicroService::build_responseERROR(std::string httpBody, std::string error)
+std::string MicroService::build_responseERROR(std::string httpBody, std::string error)
 {
     std::string http_header;
-    ACE_Message_Block* rsp = nullptr;
     std::string contentType("application/json");
 
     http_header = "HTTP/1.1 " + error + " \r\n";
@@ -908,15 +906,15 @@ ACE_Message_Block* MicroService::build_responseERROR(std::string httpBody, std::
         http_header += "Content-Length: 0\r\n";
     }
 
-    ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1KB) + httpBody.length()), nullptr);
+    //ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1KB) + httpBody.length()), nullptr);
 
-    std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    rsp->wr_ptr(http_header.length());
-    std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
-    rsp->wr_ptr(httpBody.length());
+    //std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
+    //rsp->wr_ptr(http_header.length());
+    //std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
+    //rsp->wr_ptr(httpBody.length());
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response header\n%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
-    return(rsp);
+    return(http_header);
 }
 
 ACE_INT32 MicroService::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
@@ -986,7 +984,7 @@ int MicroService::svc()
                 process_request(handle, *mb, *dbInst);
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l mb->reference_count() %d \n"), mb->reference_count()));
                 mb->release();
-		mb = nullptr;
+		        mb = nullptr;
                 break;
             }
             case ACE_Message_Block::MB_PCSIG:
@@ -1065,7 +1063,7 @@ ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
 
 ACE_INT32 WebServer::handle_input(ACE_HANDLE handle)
 {
-    (void)handle;
+    ACE_UNUSED_ARG(handle);
     int ret_status = 0;
     ACE_SOCK_Stream peerStream;
     ACE_INET_Addr peerAddr;
@@ -1355,7 +1353,7 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     req->wr_ptr(len);
 
     /* Reclaim the memory now */
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
     m_req->release();
     m_req = nullptr;
 
