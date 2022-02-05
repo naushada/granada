@@ -70,7 +70,7 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
         ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
 
         MicroService(ACE_Thread_Manager *thrMgr);
-        ~MicroService();
+        virtual ~MicroService();
 
         ACE_thread_t myThreadId() {
           return(m_threadId);
@@ -108,7 +108,7 @@ class WebConnection : public ACE_Event_Handler {
         ACE_HANDLE get_handle() const override;
 
         WebConnection(WebServer* parent);
-        ~WebConnection();
+        virtual ~WebConnection();
 
         long timerId() const {
             return(m_timerId);  
@@ -160,7 +160,7 @@ class WebServer : public ACE_Event_Handler {
         ACE_HANDLE get_handle() const override;
 
         WebServer(std::string _ip, ACE_UINT16 _port, ACE_UINT32 workerPool, std::string dbUri, std::string dbConnPool, std::string dbName);
-        ~WebServer();
+        virtual ~WebServer();
         bool start();
         bool stop();
 
