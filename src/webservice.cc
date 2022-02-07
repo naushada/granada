@@ -951,9 +951,13 @@ int MicroService::close(u_long flag)
 int MicroService::svc() 
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is spawned\n")));
+
     while(m_continue) {
+
         ACE_Message_Block *mb = nullptr;
+
         if(-1 != getq(mb)) {
+            
             switch (mb->msg_type())
             {
             case ACE_Message_Block::MB_DATA:
@@ -984,7 +988,7 @@ int MicroService::svc()
                 process_request(handle, *mb, *dbInst);
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l mb->reference_count() %d \n"), mb->reference_count()));
                 mb->release();
-		        mb = nullptr;
+		        
                 break;
             }
             case ACE_Message_Block::MB_PCSIG:
@@ -1046,6 +1050,7 @@ ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
     auto conIt = m_connectionPool.find(_handle);
 
     if(conIt != std::end(m_connectionPool)) {
+
         WebConnection* connEnt = conIt->second;
         m_connectionPool.erase(conIt);
         /* let the reactor call handle_close on this handle */
@@ -1054,6 +1059,7 @@ ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
         /* reclaim the heap memory */
         delete connEnt;
         close(_handle);
+
     } else {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebServer::handle_timedout no connEnt found for handle %d\n"), _handle));
     }
@@ -1079,15 +1085,20 @@ ACE_INT32 WebServer::handle_input(ACE_HANDLE handle)
         } else {
             ACE_NEW_RETURN(connEnt, WebConnection(this), -1);
             m_connectionPool[peerStream.get_handle()] = connEnt;
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l New connection is created and handle is %d peer ip address %d (%s) peer port %d\n"), peerStream.get_handle(),
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l New connection is created and handle is %d peer ip address %u (%s) peer port %d\n"), 
+                peerStream.get_handle(),
                 peerAddr.get_ip_address(), peerAddr.get_host_addr(), peerAddr.get_port_number()));
+
             /*! Start Handle Cleanup Timer to get rid of this handle from connectionPool*/
             long tId = start_conn_cleanup_timer(peerStream.get_handle());
             connEnt->timerId(tId);
             connEnt->handle(peerStream.get_handle());
             connEnt->connAddr(peerAddr);
+
             ACE_Reactor::instance()->register_handler(connEnt, 
-                                                      ACE_Event_Handler::READ_MASK|ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK);
+                                                      ACE_Event_Handler::READ_MASK |
+                                                      ACE_Event_Handler::TIMER_MASK | 
+                                                      ACE_Event_Handler::SIGNAL_MASK);
         }
     } else {
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Accept to new connection failed\n")));
@@ -1355,20 +1366,22 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     /* Reclaim the memory now */
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
     m_req->release();
-    m_req = nullptr;
-
+    
     m_expectedLength = -1;
 
     auto it = m_parent->currentWorker();
     MicroService* mEnt = *it;
-    mEnt->putq(req);
+    if(mEnt->putq(req) < 0) {
+        req->release();
+    }
+
     return(0);
 }
 
 ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 {
-    (void)s;
-    (void)u;
+    ACE_UNUSED_ARG(s);
+    ACE_UNUSED_ARG(u);
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l signal number - %d (%S) is received\n"), signum));
     if(m_timerId > 0) {
@@ -1380,7 +1393,7 @@ ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 
 ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
 {
-    (void)mask;
+    ACE_UNUSED_ARG(mask);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l WebConnection::handle_close handle %d will be closed upon timer expiry\n"), handle));
     return(0);
 }
