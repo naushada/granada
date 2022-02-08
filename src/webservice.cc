@@ -957,7 +957,7 @@ int MicroService::svc()
         ACE_Message_Block *mb = nullptr;
 
         if(-1 != getq(mb)) {
-            
+
             switch (mb->msg_type())
             {
             case ACE_Message_Block::MB_DATA:
@@ -984,6 +984,7 @@ int MicroService::svc()
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, mb->length()));
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), mb->length()));
+                
                 /*! Process The Request */
                 process_request(handle, *mb, *dbInst);
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l mb->reference_count() %d \n"), mb->reference_count()));
@@ -1340,28 +1341,33 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
     ACE_Message_Block* req = NULL;
 
     ACE_NEW_NORETURN(req, ACE_Message_Block((size_t) (m_expectedLength + 512)));
+    req->reset();
     req->msg_type(ACE_Message_Block::MB_DATA);
 
     /*_ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
      | 4-bytes handle   | 4-bytes db instance pointer   | 4 bytes Parent Instance |request (payload) |
      |_ _ _ _ _ _ _ _ _ |_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _|_ _ _ _ _ _ _ _ _ __ __ _|_ _ _ _ _ _ _ _ _ |
      */
-    *((ACE_HANDLE *)req->wr_ptr()) = handle;
-    req->wr_ptr(sizeof(ACE_HANDLE));
+    //*((ACE_HANDLE *)req->wr_ptr()) = handle;
+    req->copy((char *)&handle, sizeof(ACE_HANDLE));
+    //req->wr_ptr(sizeof(ACE_HANDLE));
 
     /* db instance */
     std::uintptr_t inst = reinterpret_cast<std::uintptr_t>(parent()->mongodbcInst());
-    *((std::uintptr_t* )req->wr_ptr()) = inst;
-    req->wr_ptr(sizeof(uintptr_t));
+    //*((std::uintptr_t* )req->wr_ptr()) = inst;
+    req->copy((char *)&inst, sizeof(uintptr_t));
+    //req->wr_ptr(sizeof(uintptr_t));
 
     /* parent instance */
     std::uintptr_t parent_inst = reinterpret_cast<std::uintptr_t>(parent());
-    *((std::uintptr_t* )req->wr_ptr()) = parent_inst;
-    req->wr_ptr(sizeof(uintptr_t));
+    //*((std::uintptr_t* )req->wr_ptr()) = parent_inst;
+    req->copy((char *)&parent_inst, sizeof(uintptr_t));
+    //req->wr_ptr(sizeof(uintptr_t));
 
     std::int32_t len = m_req->length();
-    std::memcpy(req->wr_ptr(), m_req->rd_ptr(), len);
-    req->wr_ptr(len);
+    //std::memcpy(req->wr_ptr(), m_req->rd_ptr(), len);
+    req->copy(m_req->rd_ptr(), len);
+    //req->wr_ptr(len);
 
     /* Reclaim the memory now */
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
