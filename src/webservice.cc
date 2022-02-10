@@ -88,12 +88,15 @@ std::int32_t MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block&
     std::int32_t offset = 0;
     do {
       ret = send(handle, (rsp.c_str() + offset), (toBeSent - offset), 0);
+
       if(ret < 0) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l sent to peer is failed\n")));
         break;
       }
+
       offset += ret;
       ret = 0;
+
     } while((toBeSent != offset));
     
     return(ret);
@@ -193,25 +196,40 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
             }
         }
     } else if(!uri.compare("/api/vendor/v1/ajoul/authorize")) {
-        std::string header;
-        header = "Connection: close\r\n"
-                 "Cache-Control: no-cache\r\n"
-                 "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n";
+        std::stringstream header("");
+        //header = "Connection: close\r\n"
+        //         "Cache-Control: no-cache\r\n";
+                // "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n";
 
-        std::string apiAuthorizeAjoul = "";
-        apiAuthorizeAjoul="------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
-                    "Content-Disposition: form-data; name=\"client_secret\"\r\n"
-                    "\r\nuCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n"
-                    "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
-                    "Content-Disposition: form-data; name=\"client_id\"\r\n"
-                    "\r\n34\r\n"
-                    "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
-                    "Content-Disposition: form-data; name=\"username\"\r\n"
-                    "\r\nAKjHYuCAco\r\n"
-                    "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
-                    "Content-Disposition: form-data; name=\"password\"\r\n"
-                    "\r\nuCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n"
-                    "------WebKitFormBoundary7MA4YWxkTrZu0gW--";
+        std::stringstream apiAuthorizeAjoul("");
+
+        apiAuthorizeAjoul << "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                          << "Content-Disposition: form-data; name=\"client_secret\"\r\n\r\n"
+                          << "uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n"
+                          << "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                          << "Content-Disposition: form-data; name=\"client_id\"\r\n\r\n"
+                          << "34\r\n"
+                          << "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                          << "Content-Disposition: form-data; name=\"username\"\r\n\r\n"
+                          << "AKjHYuCAco\r\n"
+                          << "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+                          << "Content-Disposition: form-data; name=\"password\"\r\n\r\n"
+                          << "uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n"
+                          << "------WebKitFormBoundary7MA4YWxkTrZu0gW--";
+        /*
+        apiAuthorizeAjoul << "client_secret=uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o" 
+                          <<  "&client_id=34&username=AKjHYuCAco&password=uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n";*/
+                            
+        header << "Accept: application/json\r\n"
+               <<  "Connection: Keep-Alive\r\n"
+               <<  "Cache-Control: no-cache\r\n"
+               <<  "Content-Length: " << apiAuthorizeAjoul.str().length()
+               << "\r\n"
+               <<  "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n";
+               
+        //header << "\r\n";
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the header is\n%s\n"), header.str().c_str()));
 
         std::string apiURLAjoul = "https://ajoul.com/remote/api/v1/authorize";
         ACE_SSL_SOCK_Connector client;
@@ -228,9 +246,18 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
 
         } else {
 
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Connect to https://ajoul.com is success\n")));
-            std::string httpReq = "POST /remote/api/v1/authorize HTTP/1.1\r\n" + header + "\r\n" + apiAuthorizeAjoul;
-            if(conn.send(httpReq.c_str(), httpReq.length()) < 0) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Connect to https://ajoul.com (%u) - %s is success\n"), 
+                        connectAddr.get_ip_address(), connectAddr.get_host_addr()));
+            
+            std::stringstream postReq("");
+            postReq << "POST /remote/api/v1/authorize HTTP/1.1\r\n" 
+                                      << header.str()  
+                                      << "\r\n" 
+                                      << apiAuthorizeAjoul.str();
+
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the request is\n%s\n"), postReq.str().c_str()));
+
+            if(conn.send(postReq.str().c_str(), postReq.str().length()) < 0) {
 
                 ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l send to ajoul:443 is failed\n")));
                 std::string err("400 Bad Request");
@@ -240,8 +267,10 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
             } else {
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Sent to https://ajoul.com is success\n")));
-                std::string rsp("");
-                ssize_t len = conn.recv((void *)rsp.data(), 1024, 0);
+                
+                std::array<std::uint8_t, 1024> authRsp;
+                authRsp.fill(0);
+                ssize_t len = conn.recv((void *)authRsp.data(), 1024, 0);
 
                 if(len < 0) {
                     ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l recv from ajoul:443 is failed\n")));
@@ -250,7 +279,7 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                     return(build_responseERROR(err_message, err));
 
                 } else {
-
+                    std::string rsp((char *)authRsp.data(), len);    
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Response is - %s\n"), rsp.c_str()));
                     return(build_responseOK(rsp));
                 }
@@ -1456,8 +1485,9 @@ bool WebConnection::isBufferingOfRequestCompleted()
                         /* +512 is to avoid buffer overflow */
                         ACE_NEW_NORETURN(m_req, ACE_Message_Block((size_t)(expected_length + 512)));
                         /* copy the read buffer into m_req data member */
-                        std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
-                        m_req->wr_ptr(len);
+                        //std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
+                        //m_req->wr_ptr(len);
+                        m_req->copy((char *)scratch_pad.data(), len);
                         m_expectedLength = expected_length;
                     }
                 } else {
@@ -1466,8 +1496,9 @@ bool WebConnection::isBufferingOfRequestCompleted()
                     /* +512 is to avoid buffer overflow */
                     ACE_NEW_NORETURN(m_req, ACE_Message_Block((size_t)(len + 512)));
                     /* copy the read buffer into m_req data member */
-                    std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
-                    m_req->wr_ptr(len);
+                    //std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
+                    //m_req->wr_ptr(len);
+                    m_req->copy((char *)scratch_pad.data(), len);
                     m_expectedLength = len;
                 }
             }
@@ -1480,6 +1511,7 @@ bool WebConnection::isBufferingOfRequestCompleted()
         std::int32_t remainingLength = m_expectedLength - m_req->length();
         std::int32_t offset = 0;
         char* buf = (char* )m_req->wr_ptr();
+
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Reading in loop for handle %d\n"), m_handle));
         do {
 
@@ -1491,9 +1523,11 @@ bool WebConnection::isBufferingOfRequestCompleted()
 
             offset += len;
             m_req->wr_ptr(len);
+
         }while(offset != remainingLength);
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l offset %d remainingLength %d\n"), offset, remainingLength));
+
         if(len < 0) {
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l Receive failed for handle %d\n"), m_handle));
             return(true);
