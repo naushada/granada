@@ -215,14 +215,15 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                           << "------WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
                           << "Content-Disposition: form-data; name=\"password\"\r\n\r\n"
                           << "uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n"
-                          << "------WebKitFormBoundary7MA4YWxkTrZu0gW--";
+                          << "------WebKitFormBoundary7MA4YWxkTrZu0gW--\r\n";
         /*
         apiAuthorizeAjoul << "client_secret=uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o" 
                           <<  "&client_id=34&username=AKjHYuCAco&password=uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n";*/
                             
         header << "Accept: application/json\r\n"
-               <<  "Connection: Keep-Alive\r\n"
-               <<  "Cache-Control: no-cache\r\n"
+               << "Connection: keep-alive\r\n"
+               << "Cache-Control: no-cache\r\n"
+               << "Content-Type: application/x-www-form-urlencoded\r\n"
                <<  "Content-Length: " << apiAuthorizeAjoul.str().length()
                << "\r\n"
                <<  "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n";
@@ -251,13 +252,13 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
             
             std::stringstream postReq("");
             postReq << "POST /remote/api/v1/authorize HTTP/1.1\r\n" 
-                                      << header.str()  
+                                      << header.str()
                                       << "\r\n" 
                                       << apiAuthorizeAjoul.str();
 
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the request is\n%s\n"), postReq.str().c_str()));
 
-            if(conn.send(postReq.str().c_str(), postReq.str().length()) < 0) {
+            if(conn.send_n(postReq.str().c_str(), postReq.str().length()) < 0) {
 
                 ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l send to ajoul:443 is failed\n")));
                 std::string err("400 Bad Request");
@@ -1017,8 +1018,9 @@ int MicroService::svc()
                 /*! Process The Request */
                 process_request(handle, *mb, *dbInst);
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l mb->reference_count() %d \n"), mb->reference_count()));
-                mb->release();
-		        
+                //mb->release();
+		delete mb;
+
                 break;
             }
             case ACE_Message_Block::MB_PCSIG:
@@ -1400,14 +1402,16 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 
     /* Reclaim the memory now */
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
-    m_req->release();
-    
+    //m_req->release();
+    delete m_req;
+
     m_expectedLength = -1;
 
     auto it = m_parent->currentWorker();
     MicroService* mEnt = *it;
     if(mEnt->putq(req) < 0) {
-        req->release();
+        //req->release();
+	delete req;
     }
 
     return(0);
@@ -1482,6 +1486,7 @@ bool WebConnection::isBufferingOfRequestCompleted()
                     if(CL.length()) {
                         std::int32_t expected_length = http.header().length() + std::stoi(CL);
                         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Expected Length %d received length %d\n"), expected_length, len));
+
                         /* +512 is to avoid buffer overflow */
                         ACE_NEW_NORETURN(m_req, ACE_Message_Block((size_t)(expected_length + 512)));
                         /* copy the read buffer into m_req data member */
