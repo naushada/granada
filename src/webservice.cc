@@ -1018,9 +1018,8 @@ int MicroService::svc()
                 /*! Process The Request */
                 process_request(handle, *mb, *dbInst);
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l mb->reference_count() %d \n"), mb->reference_count()));
-                //mb->release();
-		delete mb;
-
+                mb->release();
+		
                 break;
             }
             case ACE_Message_Block::MB_PCSIG:
@@ -1086,7 +1085,9 @@ ACE_INT32 WebServer::handle_timeout(const ACE_Time_Value& tv, const void* act)
         WebConnection* connEnt = conIt->second;
         m_connectionPool.erase(conIt);
         /* let the reactor call handle_close on this handle */
-        ACE_Reactor::instance()->remove_handler(_handle, ACE_Event_Handler::READ_MASK | ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK);
+        ACE_Reactor::instance()->remove_handler(_handle, ACE_Event_Handler::READ_MASK | 
+                                                         ACE_Event_Handler::TIMER_MASK | 
+                                                         ACE_Event_Handler::SIGNAL_MASK);
         stop_conn_cleanup_timer(connEnt->timerId());
         /* reclaim the heap memory */
         delete connEnt;
@@ -1263,7 +1264,9 @@ WebServer::~WebServer()
 
 bool WebServer::start()
 {
-    ACE_Reactor::instance()->register_handler(this, ACE_Event_Handler::ACCEPT_MASK | ACE_Event_Handler::TIMER_MASK | ACE_Event_Handler::SIGNAL_MASK); 
+    ACE_Reactor::instance()->register_handler(this, ACE_Event_Handler::ACCEPT_MASK | 
+                                                    ACE_Event_Handler::TIMER_MASK |
+                                                    ACE_Event_Handler::SIGNAL_MASK); 
     /* subscribe for signal */
     ACE_Sig_Set ss;
     ss.empty_set();
@@ -1330,13 +1333,13 @@ WebConnection::WebConnection(WebServer* parent)
 WebConnection::~WebConnection()
 {
     close(m_handle);
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l WebConnection dtor is invoked\n")));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebConnection dtor is invoked\n")));
 }
 
 ACE_INT32 WebConnection::handle_timeout(const ACE_Time_Value &tv, const void *act)
 {
     (void)tv;
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Webconnection::handle_timedout\n")));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Webconnection::handle_timedout\n")));
     std::uintptr_t handle = reinterpret_cast<std::uintptr_t>(act);
     auto conIt = m_parent->connectionPool().find(handle);
 
@@ -1348,7 +1351,7 @@ ACE_INT32 WebConnection::handle_timeout(const ACE_Time_Value &tv, const void *ac
 
 ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle_input on handle %d\n"), m_handle));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l handle_input on handle %d\n"), m_handle));
     if(!isBufferingOfRequestCompleted()) {
         return(0);
     }
@@ -1379,40 +1382,38 @@ ACE_INT32 WebConnection::handle_input(ACE_HANDLE handle)
      | 4-bytes handle   | 4-bytes db instance pointer   | 4 bytes Parent Instance |request (payload) |
      |_ _ _ _ _ _ _ _ _ |_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _|_ _ _ _ _ _ _ _ _ __ __ _|_ _ _ _ _ _ _ _ _ |
      */
-    //*((ACE_HANDLE *)req->wr_ptr()) = handle;
-    req->copy((char *)&handle, sizeof(ACE_HANDLE));
-    //req->wr_ptr(sizeof(ACE_HANDLE));
+    *((ACE_HANDLE *)req->wr_ptr()) = handle;
+    //req->copy((char *)&handle, sizeof(ACE_HANDLE));
+    req->wr_ptr(sizeof(ACE_HANDLE));
 
     /* db instance */
     std::uintptr_t inst = reinterpret_cast<std::uintptr_t>(parent()->mongodbcInst());
-    //*((std::uintptr_t* )req->wr_ptr()) = inst;
-    req->copy((char *)&inst, sizeof(uintptr_t));
-    //req->wr_ptr(sizeof(uintptr_t));
+    *((std::uintptr_t* )req->wr_ptr()) = inst;
+    //req->copy((char *)&inst, sizeof(uintptr_t));
+    req->wr_ptr(sizeof(uintptr_t));
 
     /* parent instance */
     std::uintptr_t parent_inst = reinterpret_cast<std::uintptr_t>(parent());
-    //*((std::uintptr_t* )req->wr_ptr()) = parent_inst;
-    req->copy((char *)&parent_inst, sizeof(uintptr_t));
-    //req->wr_ptr(sizeof(uintptr_t));
+    *((std::uintptr_t* )req->wr_ptr()) = parent_inst;
+    //req->copy((char *)&parent_inst, sizeof(uintptr_t));
+    req->wr_ptr(sizeof(uintptr_t));
 
     std::int32_t len = m_req->length();
-    //std::memcpy(req->wr_ptr(), m_req->rd_ptr(), len);
-    req->copy(m_req->rd_ptr(), len);
-    //req->wr_ptr(len);
+    std::memcpy(req->wr_ptr(), m_req->rd_ptr(), len);
+    //req->copy(m_req->rd_ptr(), len);
+    req->wr_ptr(len);
 
     /* Reclaim the memory now */
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [master:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
-    //m_req->release();
-    delete m_req;
-
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l m_req->reference_count() %d \n"), m_req->reference_count()));
+    m_req->release();
+    
     m_expectedLength = -1;
 
     auto it = m_parent->currentWorker();
     MicroService* mEnt = *it;
     if(mEnt->putq(req) < 0) {
-        //req->release();
-	delete req;
-    }
+        req->release();
+	}
 
     return(0);
 }
@@ -1422,9 +1423,9 @@ ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
     ACE_UNUSED_ARG(s);
     ACE_UNUSED_ARG(u);
 
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l signal number - %d (%S) is received\n"), signum));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l signal number - %d (%S) is received\n"), signum));
     if(m_timerId > 0) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Running timer is stopped for signal (%S)\n"), signum));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Running timer is stopped for signal (%S)\n"), signum));
         m_parent->stop_conn_cleanup_timer(m_timerId);
     }
     return(0);
@@ -1433,13 +1434,13 @@ ACE_INT32 WebConnection::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 ACE_INT32 WebConnection::handle_close (ACE_HANDLE handle, ACE_Reactor_Mask mask)
 {
     ACE_UNUSED_ARG(mask);
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l WebConnection::handle_close handle %d will be closed upon timer expiry\n"), handle));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebConnection::handle_close handle %d will be closed upon timer expiry\n"), handle));
     return(0);
 }
 
 ACE_HANDLE WebConnection::get_handle() const
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l WebConnection::get_handle - handle %d\n"), m_handle));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l WebConnection::get_handle - handle %d\n"), m_handle));
     return(m_handle);
 }
 
@@ -1464,7 +1465,7 @@ bool WebConnection::isBufferingOfRequestCompleted()
         len = recv(handle(), scratch_pad.data(), scratch_pad.size(), 0);
 
         if(len < 0) {
-            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l Receive failed for handle %d\n"), m_handle));
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Receive failed for handle %d\n"), m_handle));
             return(len);
         } else {
 
@@ -1485,25 +1486,25 @@ bool WebConnection::isBufferingOfRequestCompleted()
                     /* This Must be POST or PUT Method. */
                     if(CL.length()) {
                         std::int32_t expected_length = http.header().length() + std::stoi(CL);
-                        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Expected Length %d received length %d\n"), expected_length, len));
+                        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Expected Length %d received length %d\n"), expected_length, len));
 
                         /* +512 is to avoid buffer overflow */
                         ACE_NEW_NORETURN(m_req, ACE_Message_Block((size_t)(expected_length + 512)));
                         /* copy the read buffer into m_req data member */
-                        //std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
-                        //m_req->wr_ptr(len);
-                        m_req->copy((char *)scratch_pad.data(), len);
+                        std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
+                        m_req->wr_ptr(len);
+                        //m_req->copy((char *)scratch_pad.data(), len);
                         m_expectedLength = expected_length;
                     }
                 } else {
                     /* Content-Length: is not present in the Header */
-                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Expected Length %d received length %d\n"), len, len));
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Expected Length %d received length %d\n"), len, len));
                     /* +512 is to avoid buffer overflow */
                     ACE_NEW_NORETURN(m_req, ACE_Message_Block((size_t)(len + 512)));
                     /* copy the read buffer into m_req data member */
-                    //std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
-                    //m_req->wr_ptr(len);
-                    m_req->copy((char *)scratch_pad.data(), len);
+                    std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
+                    m_req->wr_ptr(len);
+                    //m_req->copy((char *)scratch_pad.data(), len);
                     m_expectedLength = len;
                 }
             }
@@ -1517,12 +1518,12 @@ bool WebConnection::isBufferingOfRequestCompleted()
         std::int32_t offset = 0;
         char* buf = (char* )m_req->wr_ptr();
 
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Reading in loop for handle %d\n"), m_handle));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Reading in loop for handle %d\n"), m_handle));
         do {
 
             len = recv(handle(), (buf + offset), (remainingLength - offset), 0);
             if(len < 0) {
-                ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l Receive failed for handle %d\n"), m_handle));
+                ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Receive failed for handle %d\n"), m_handle));
                 return(true);
             }
 
@@ -1531,10 +1532,10 @@ bool WebConnection::isBufferingOfRequestCompleted()
 
         }while(offset != remainingLength);
 
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l offset %d remainingLength %d\n"), offset, remainingLength));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l offset %d remainingLength %d\n"), offset, remainingLength));
 
         if(len < 0) {
-            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l Receive failed for handle %d\n"), m_handle));
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Receive failed for handle %d\n"), m_handle));
             return(true);
         } else {
             /* do we have all contents of a request? */
