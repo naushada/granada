@@ -536,7 +536,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
-    } else if(!uri.compare("/api/senderRefNoList")) {
+    } else if(!uri.compare("/api/senderrefnolist")) {
         std::string collectionName("shipping");
         auto refNo = http.get_element("senderRefNo");
         auto accCode = http.get_element("accountCode");
@@ -582,7 +582,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
-    } else if(!uri.compare("/api/senderRefNo")) {
+    } else if(!uri.compare("/api/senderrefno")) {
         std::string collectionName("shipping");
         auto refNo = http.get_element("senderRefNo");
         auto accCode = http.get_element("accountCode");
