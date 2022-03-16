@@ -446,7 +446,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
 
     } else if(!uri.compare("/api/awbnolist")) {
         std::string collectionName("shipping");
-        auto awbNo = http.get_element("shipmentNo");
+        auto awbNo = http.get_element("awbNo");
         auto accCode = http.get_element("accountCode");
         std::string document("");
 
@@ -492,7 +492,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
 
     } else if(!uri.compare("/api/altrefnolist")) {
         std::string collectionName("shipping");
-        auto awbNo = http.get_element("shipmentNo");
+        auto awbNo = http.get_element("awbNo");
         auto accCode = http.get_element("accountCode");
         std::string document("");
 
@@ -538,7 +538,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
 
     } else if(!uri.compare("/api/senderrefnolist")) {
         std::string collectionName("shipping");
-        auto refNo = http.get_element("senderRefNo");
+        auto refNo = http.get_element("awbNo");
         auto accCode = http.get_element("accountCode");
         std::string document("");
 
