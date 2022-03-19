@@ -102,6 +102,51 @@ std::int32_t MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block&
     return(ret);
 }
 
+std::int32_t MicroService::process_request(ACE_HANDLE handle, std::string& req, MongodbClient& dbInst)
+{
+    std::string http_header, http_body;
+    http_header.clear();
+    http_body.clear();
+    std::string rsp;
+
+    //std::string req(mb.rd_ptr(), mb.length());
+
+    if(std::string::npos != req.find("OPTIONS", 0)) {
+      rsp = handle_OPTIONS(req);
+    } else if(std::string::npos != req.find("GET", 0)) {
+      rsp = handle_GET(req, dbInst); 
+    } else if(std::string::npos != req.find("POST", 0)) {
+      rsp = handle_POST(req, dbInst);
+    } else if(std::string::npos != req.find("PUT", 0)) {
+      rsp = handle_PUT(req, dbInst);
+    } else if(std::string::npos != req.find("DELETE", 0)) {
+      rsp = handle_DELETE(req, dbInst);  
+    } else {
+      /* Not supported Method */
+    }
+
+    std::int32_t ret = 0;
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the response length is %d\n"), rsp.length()));
+    
+    std::int32_t  toBeSent = rsp.length();
+    std::int32_t offset = 0;
+    do {
+      ret = send(handle, (rsp.c_str() + offset), (toBeSent - offset), 0);
+
+      if(ret < 0) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l sent to peer is failed\n")));
+        break;
+      }
+
+      offset += ret;
+      ret = 0;
+
+    } while((toBeSent != offset));
+    
+    return(ret);
+}
+
+
 std::string MicroService::get_contentType(std::string ext)
 {
     std::string cntType("");
@@ -983,10 +1028,9 @@ int MicroService::svc()
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is spawned\n")));
 
     while(m_continue) {
-
-        ACE_Message_Block *mb = nullptr;
-
+      ACE_Message_Block *mb = nullptr;
         if(-1 != getq(mb)) {
+          std::uint32_t offset = 0;
 
             switch (mb->msg_type())
             {
@@ -996,17 +1040,19 @@ int MicroService::svc()
                  | 4-bytes handle   | 4-bytes db instance pointer   | request (payload) |
                  |_ _ _ _ _ _ _ _ _ |_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _|_ _ _ _ _ _ _ _ _ _|
                 */
-                ACE_HANDLE handle = *((ACE_HANDLE *)mb->rd_ptr());
-                mb->rd_ptr(sizeof(ACE_HANDLE));
+                ACE_HANDLE handle = *((ACE_HANDLE *)&mb->rd_ptr()[offset]);
+                //mb->rd_ptr(sizeof(ACE_HANDLE));
+                offset += sizeof(ACE_HANDLE);
 
-                std::uintptr_t inst = *((std::uintptr_t *)mb->rd_ptr());
+                std::uintptr_t inst = *((std::uintptr_t *)&mb->rd_ptr()[offset]);
                 MongodbClient* dbInst = reinterpret_cast<MongodbClient*>(inst);
-                mb->rd_ptr(sizeof(uintptr_t));
-
+                //mb->rd_ptr(sizeof(uintptr_t));
+                offset += sizeof(std::uintptr_t);
                 /* Parent instance */
-                std::uintptr_t parent_inst = *((std::uintptr_t *)mb->rd_ptr());
+                std::uintptr_t parent_inst = *((std::uintptr_t *)&mb->rd_ptr()[offset]);
                 WebServer* parent = reinterpret_cast<WebServer*>(parent_inst);
-                mb->rd_ptr(sizeof(uintptr_t));
+                //mb->rd_ptr(sizeof(uintptr_t));
+                offset += sizeof(uintptr_t);
 
                 ACE_UNUSED_ARG(parent);
 
@@ -1014,9 +1060,11 @@ int MicroService::svc()
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l handle %d length %d \n"), handle, mb->length()));
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), mb->length()));
-                
+               
+                std::string request((char *)&mb->rd_ptr()[offset], mb->length() - offset); 
                 /*! Process The Request */
-                process_request(handle, *mb, *dbInst);
+                //process_request(handle, *mb, *dbInst);
+                process_request(handle, request, *dbInst);
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l mb->reference_count() %d \n"), mb->reference_count()));
                 mb->release();
 		
