@@ -707,9 +707,21 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
         auto fromDate = http.get_element("fromDate");
         auto toDate = http.get_element("toDate");
         auto accCode = http.get_element("accountCode");
+        auto country = http.get_element("country");
         std::string document("");
 
-        if(fromDate.length() && toDate.length() && accCode.length()) {
+        if(fromDate.length() && toDate.length() && country.length() && accCode.length()) {
+            /* do an authentication with DB now */
+            document = "{\"$and\": [{\"country\": \"" + country + "\"}, {\"accountCode\":\"" + accCode + "\"}, {\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+                        "\"$lte\": \"" + toDate + "\"}}]}";
+
+        } else if(fromDate.length() && toDate.length() && country.length()) {
+            /* do an authentication with DB now */
+            document = "{\"$and\": [{\"country\": \"" + country + "\"}, {\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+                        "\"$lte\": \"" + toDate + "\"}}]}";
+
+
+        }  else if(fromDate.length() && toDate.length() && accCode.length()) {
             /* do an authentication with DB now */
             document = "{\"$and\": [{\"accountCode\": \"" + accCode + "\"}, {\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
                         "\"$lte\": \"" + toDate + "\"}}]}";
@@ -1061,7 +1073,7 @@ int MicroService::svc()
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l httpReq length %d\n"), mb->length()));
                
-                std::string request((char *)&mb->rd_ptr()[offset], mb->length() - offset); 
+                std::string request((char *)&mb->rd_ptr()[offset], (mb->length() - offset)); 
                 /*! Process The Request */
                 //process_request(handle, *mb, *dbInst);
                 process_request(handle, request, *dbInst);
