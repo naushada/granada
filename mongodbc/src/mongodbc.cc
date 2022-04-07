@@ -236,6 +236,51 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
     return(std::string(result.str()));
 }
 
+std::string MongodbClient::get_documents(std::string collectionName, std::string projection)
+{
+    auto conn = mMongoConnPool->acquire();
+    if(!conn) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
+    mongocxx::database dbInst = conn->database(get_database().c_str());
+    if(!dbInst) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse %s\n"), collectionName.c_str()));
+        return(std::string());
+    }
+
+    auto collection = dbInst.collection(collectionName.c_str());
+    bsoncxx::document::view_or_value filter;
+
+    bsoncxx::document::view_or_value outputProjection = bsoncxx::from_json(projection.c_str());
+
+    using namespace std::literals::chrono_literals;
+    mongocxx::options::find opts{};
+    std::chrono::milliseconds ms(5000);
+
+    opts.max_time(ms).no_cursor_timeout(false).projection(outputProjection);
+    mongocxx::cursor cursor = collection.find({}, opts);
+    mongocxx::cursor::iterator iter = cursor.begin();
+
+    if(iter == cursor.end()) {
+        return(std::string());
+    }
+
+    std::stringstream result("");
+    result << "[";
+
+    for(; iter != cursor.end(); ++iter) {
+        result << bsoncxx::to_json(*iter).c_str()
+               << ",";
+    }
+
+    result.seekp(-1, std::ios_base::end);
+    result << "]";
+
+    return(std::string(result.str()));
+}
+
 std::string MongodbClient::create_document(std::string collectionName, std::string doc)
 {
     bsoncxx::document::value document = bsoncxx::from_json(doc.c_str());

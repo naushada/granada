@@ -55,6 +55,7 @@ class MongodbClient {
         std::string create_documentEx(std::string coll, std::string accountRecord);
         std::string get_document(std::string collectionName, std::string query, std::string fieldProjection);
         std::string get_documents(std::string collectionName, std::string query, std::string fieldProjection);
+        std::string get_documents(std::string collectionName, std::string fieldProjection);
         std::string get_documentEx(std::string collectionName, std::string query, std::string fieldProjection);
         std::string get_documentsEx(std::string collectionName, std::string query, std::string fieldProjection);
         std::string get_byOID(std::string collection, std::string projection, std::string oid);

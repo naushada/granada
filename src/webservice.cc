@@ -114,6 +114,7 @@ std::int32_t MicroService::process_request(ACE_HANDLE handle, std::string& req, 
     if(std::string::npos != req.find("OPTIONS", 0)) {
       rsp = handle_OPTIONS(req);
     } else if(std::string::npos != req.find("GET", 0)) {
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l REQ %s\n"), req.c_str()));
       rsp = handle_GET(req, dbInst); 
     } else if(std::string::npos != req.find("POST", 0)) {
       rsp = handle_POST(req, dbInst);
@@ -372,8 +373,30 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"User Id or Password Not provided\", \"errorCode\" : 400}");
             return(build_responseERROR(err_message, err));
         }
-    } else if(!uri.compare("/api/account")) {
+    
+    } else if(!uri.compare("/api/accountlist")) {
         std::string collectionName("account");
+
+        /* do an authentication with DB now */
+        std::string query = "{\"role\" : \"Customer\" }";
+
+        //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
+        //std::string projection("{\"_id\" : false, \"accountCode\": true, \"name\" : true}");
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l get_documents for /api/accountlist\n")));
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_documents(collectionName, projection);
+        if(!record.length()) {
+            /* No Customer Account is found */
+            std::string err("404 Not Found");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"There\'s no customer record\", \"error\" : 404}");
+            return(build_responseERROR(err_message, err));
+        }
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
+        return(build_responseOK(record));
+
+    } else if(!uri.compare("/api/account")) {
+          std::string collectionName("account");
 
         /* user is trying to log in - authenticate now */
         auto user = http.get_element("accountCode");
@@ -394,25 +417,6 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
                 return(build_responseERROR(err_message, err));
             }
         }
-
-    } else if(!uri.compare("/api/accountlist")) {
-        std::string collectionName("account");
-
-        /* do an authentication with DB now */
-        std::string query = "{\"role\" : \"Customer\" }";
-
-        //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
-        std::string projection("{\"_id\" : false, \"accountCode\": true, \"name\" : true}");
-        std::string record = dbInst.get_documents(collectionName, query, projection);
-        if(!record.length()) {
-            /* No Customer Account is found */
-            std::string err("404 Not Found");
-            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"There\'s no customer record\", \"error\" : 404}");
-            return(build_responseERROR(err_message, err));
-        }
-
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
-        return(build_responseOK(record));
 
     } else if(!uri.compare("/api/shipping") || (!uri.compare("/api/shipment"))) {
         std::string collectionName("shipping");
@@ -1555,6 +1559,16 @@ bool WebConnection::isBufferingOfRequestCompleted()
                         m_req->wr_ptr(len);
                         //m_req->copy((char *)scratch_pad.data(), len);
                         m_expectedLength = expected_length;
+
+                    } else {
+
+                        /* +512 is to avoid buffer overflow */
+                        ACE_NEW_NORETURN(m_req, ACE_Message_Block((size_t)(len + 512)));
+                        /* copy the read buffer into m_req data member */
+                        std::memcpy(m_req->wr_ptr(), scratch_pad.data(), len);
+                        m_req->wr_ptr(len);
+                        m_expectedLength = len;
+
                     }
                 } else {
                     /* Content-Length: is not present in the Header */
