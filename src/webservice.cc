@@ -332,7 +332,23 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 }
             }
         }
-    } 
+    } else if(!uri.compare("/api/manifest")) {
+        /* Creating sku for inventory */
+        std::string content = http.body();
+        std::string coll("inventory");
+
+        if(content.length()) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
+            std::string record = dbInst.create_document(coll, content);
+
+            if(record.length()) {
+                std::string rsp("");
+                rsp = "{\"oid\" : \"" + record + "\"}";
+                return(build_responseOK(rsp));
+            }
+        }
+    }
+
     return(build_responseOK(std::string()));
 }
 
@@ -721,7 +737,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
 
         } else if(fromDate.length() && toDate.length() && country.length()) {
             /* do an authentication with DB now */
-            document = "{\"$and\": [{\"country\": \"" + country + "\"}, {\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+            document = "{\"$and\": [{\"receiverCountry\": \"" + country + "\"}, {\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
                         "\"$lte\": \"" + toDate + "\"}}]}";
 
 
@@ -750,6 +766,9 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l No Record is found \n")));
             return(build_responseERROR(err_message, err));
         }
+
+    } else if(!uri.compare("/api/manifest")) {
+      /* GET for inventory - could be all or based on sku */
 
     } else if((!uri.compare(0, 7, "/webui/"))) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
@@ -897,6 +916,8 @@ std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
         std::string err("400 Bad Request");
         std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
         return(build_responseERROR(err_message, err));
+    } else if(!uri.compare("/api/manifest")) {
+      /* Updating inventory */
     }
 
     return(build_responseOK(std::string()));
