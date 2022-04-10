@@ -769,7 +769,33 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
 
     } else if(!uri.compare("/api/manifest")) {
       /* GET for inventory - could be all or based on sku */
+        std::string document("");
+        auto sku = http.get_element("sku");
+        auto accCode = http.get_element("accountCode");
 
+        if(accCode.length() > 0) {
+            document = "{\"accountCode\": \"" + accCode + "\", \"sku\" : \""  + sku + "\"}"; 
+
+        } else {
+            document = "{\"sku\" : \""  + sku + "\"}"; 
+
+        }
+
+        std::string collectionName("inventory");
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_documents(collectionName, document, projection);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Inventory Querying\n")));
+
+        if(record.length()) {
+            return(build_responseOK(record));
+
+        } else {
+            /* No Customer Account is found */
+            std::string err("404 Not Found");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"There\'s no Inventory Record\", \"error\" : 404}");
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l No Record is found \n")));
+            return(build_responseERROR(err_message, err));
+        }
     } else if((!uri.compare(0, 7, "/webui/"))) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
         /* build the file name now */
@@ -918,6 +944,34 @@ std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
         return(build_responseERROR(err_message, err));
     } else if(!uri.compare("/api/manifest")) {
       /* Updating inventory */
+        std::string coll("inventory");
+        std::string content = http.body();
+
+        std::string sku = http.get_element("sku");
+        std::string qty = http.get_element("qty");
+        std::string acc = http.get_element("accountCode");
+        std::string query;
+
+        if(sku.length() && qty.length() & acc.length()) {
+          query = "{\"sku\" : \"" + sku +"\"," + "\"accountCode\" :" + "\"" + acc + "\"}";
+        } else if(sku.length() && qty.length()) {
+          query = "{\"sku\" : \"" + sku + "\"}";
+        }
+
+        std::string document = "{\"$inc\": {\"qty\" : -" + qty + "}}";
+
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n Query %s\n"), document.c_str(), query.c_str()));
+        bool rsp = dbInst.update_collection(coll, query, document);
+
+        if(rsp) {
+            std::string r("");
+            r = "{\"status\": \"success\"}";
+            return(build_responseOK(r));
+        }
+        std::string err("400 Bad Request");
+        std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
+        return(build_responseERROR(err_message, err));
     }
 
     return(build_responseOK(std::string()));
