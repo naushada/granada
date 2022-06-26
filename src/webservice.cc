@@ -1118,6 +1118,8 @@ int MicroService::svc()
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Micro service is spawned\n")));
 
+    webServer().semaphore().release();
+
     while(m_continue) {
       ACE_Message_Block *mb = nullptr;
         if(-1 != getq(mb)) {
@@ -1169,6 +1171,7 @@ int MicroService::svc()
                         mb->release();
                     }
                     msg_queue()->deactivate();
+                    webServer().semaphore().release();
                     break;
                 }
             default:
@@ -1188,16 +1191,18 @@ int MicroService::svc()
     return(0);
 }
 
-MicroService::MicroService(ACE_Thread_Manager* thr_mgr) :
+MicroService::MicroService(ACE_Thread_Manager* thr_mgr, WebServer *parent) :
     ACE_Task<ACE_MT_SYNCH>(thr_mgr)
 {
     m_continue = true;
     m_threadId = thr_mgr->thr_self();
+    m_parent = parent;
 }
 
 MicroService::~MicroService()
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Microservice dtor is invoked\n")));
+    m_parent = nullptr;
 }
 
 /*
@@ -1288,31 +1293,47 @@ ACE_INT32 WebServer::handle_signal(int signum, siginfo_t* s, ucontext_t* ctx)
 
     if(!workerPool().empty()) {
         std::for_each(workerPool().begin(), workerPool().end(), [&](MicroService* ms) ->void {
+
+            semaphore().acquire();
             ACE_Message_Block* req = nullptr;
             ACE_NEW_NORETURN(req, ACE_Message_Block((size_t)MemorySize::SIZE_1KB));
             req->msg_type(ACE_Message_Block::MB_PCSIG);
             ms->putq(req);
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l Sending to Worker Node\n")));
+
         });
     }
 
     if(!connectionPool().empty()) {
-      for(auto it = connectionPool().begin(); it != connectionPool().end(); ++it) {
+      for(auto it = connectionPool().begin(); it != connectionPool().end();) {
+
         auto wc = it->second;
+        it = connectionPool().erase(it);
         stop_conn_cleanup_timer(wc->timerId());
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Master:%t] %M %N:%l its name %S is received for WebServer\n"), signum));
         delete wc;
+
       }
+      
       connectionPool().clear();
     }
+
+    ACE_Reactor::instance()->remove_handler(m_server.get_handle(), ACE_Event_Handler::ACCEPT_MASK | 
+                                                         ACE_Event_Handler::TIMER_MASK | 
+                                                         ACE_Event_Handler::SIGNAL_MASK);
 
     return(0);
 }
 
 ACE_INT32 WebServer::handle_close(ACE_HANDLE handle, ACE_Reactor_Mask mask)
 {
-    ACE_UNUSED_ARG(handle);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Closing connection on handle %d for webServer\n"), handle));
+    if(handle > 0) {
+        m_server.close();
+        m_stopMe = true;
+    }
     ACE_UNUSED_ARG(mask);
+    
     return(0);
 }
 
@@ -1370,14 +1391,19 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
     //mMongodbc = new MongodbClient(uri);
     mMongodbc = std::make_unique<MongodbClient>(uri);
 
+    ACE_NEW_NORETURN(m_semaphore, ACE_Semaphore());
+
     m_workerPool.clear();
     std::uint32_t cnt;
 
     for(cnt = 0; cnt < workerPool; ++cnt) {
+
+        semaphore().acquire();
         MicroService* worker = nullptr;
-        ACE_NEW_NORETURN(worker, MicroService(ACE_Thread_Manager::instance()));
+        ACE_NEW_NORETURN(worker, MicroService(ACE_Thread_Manager::instance(), this));
         m_workerPool.push_back(worker);
         worker->open();
+        
     }
 
     m_currentWorker = std::begin(m_workerPool);
@@ -1394,11 +1420,17 @@ WebServer::~WebServer()
     mMongodbc.reset(nullptr);
 
     if(!workerPool().empty()) {
-        for(auto it = workerPool().begin(); it != workerPool().end(); ++it) {
+        for(auto it = workerPool().begin(); it != workerPool().end();) {
+            
             auto ent = *it;
             delete ent;
+            it = workerPool().erase(it);
+
         }
+        workerPool().clear();
     }
+
+    delete m_semaphore;
 }
 
 bool WebServer::start()
@@ -1416,10 +1448,12 @@ bool WebServer::start()
     ACE_Time_Value to(1,0);
 
     while(!m_stopMe) {
-        ACE_Reactor::instance()->handle_events(to);
+        ACE_INT32 ret = ACE_Reactor::instance()->handle_events(to);
+        if(ret < 0) break;
     }
 
-    return(m_stopMe);
+    ACE_Reactor::instance()->remove_handler(ss); 
+    return(0);
 }
 
 bool WebServer::stop()

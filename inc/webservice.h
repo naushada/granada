@@ -25,6 +25,7 @@
 #include "ace/SSL/SSL_SOCK.h"
 #include "ace/SSL/SSL_SOCK_Stream.h"
 #include "ace/SSL/SSL_SOCK_Connector.h"
+#include "ace/Semaphore.h"
 
 
 #include "mongodbc.h"
@@ -69,7 +70,7 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
 
         ACE_INT32 handle_signal(int signum, siginfo_t *s, ucontext_t *u) override;
 
-        MicroService(ACE_Thread_Manager *thrMgr);
+        MicroService(ACE_Thread_Manager *thrMgr, WebServer *parent);
         virtual ~MicroService();
 
         ACE_thread_t myThreadId() {
@@ -79,6 +80,10 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
           std::uint32_t st = ACE_Thread_Manager::ACE_THR_RUNNING;
           ACE_Thread_Manager::instance()->thr_state(m_threadId, st);
           return(ACE_Thread_Manager::ACE_THR_RUNNING == st);
+        }
+
+        WebServer& webServer() const {
+            return(*m_parent);
         }
 
         std::int32_t process_request(ACE_HANDLE handle, ACE_Message_Block& mb, MongodbClient& dbInst);
@@ -97,6 +102,7 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
         bool m_continue;
         ACE_thread_t m_threadId;
         bool m_iAmDone;
+        WebServer *m_parent;
         
 };
 
@@ -191,6 +197,11 @@ class WebServer : public ACE_Event_Handler {
         MongodbClient* mongodbcInst() {
             return(mMongodbc.get());
         }
+
+        ACE_Semaphore& semaphore() const {
+            return(*m_semaphore);
+        }
+
     private:
         ACE_Message_Block m_mb;
         ACE_SOCK_Stream m_stream;
@@ -202,6 +213,7 @@ class WebServer : public ACE_Event_Handler {
         std::vector<MicroService*>::iterator m_currentWorker;
         /* mongo db interface */
         std::unique_ptr<MongodbClient> mMongodbc;
+        ACE_Semaphore *m_semaphore;
 
 };
 
