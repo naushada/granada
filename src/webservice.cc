@@ -1363,12 +1363,6 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
     /* Stop the Webserver when this m_stopMe becomes true. */
     m_stopMe = false;
 
-    int reuse_addr = 1;
-    if(m_server.open(m_listen, reuse_addr)) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Starting of WebServer failed - opening of port %d hostname %s\n"), 
-                m_listen.get_port_number(), m_listen.get_host_name()));
-    }
-
     /* Mongo DB interface */
     std::string uri("mongodb://127.0.0.1:27017");
     std::string _dbName("bayt");
@@ -1408,6 +1402,12 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
 
     m_currentWorker = std::begin(m_workerPool);
 
+    /* Start listening for incoming connection */
+    int reuse_addr = 1;
+    if(m_server.open(m_listen, reuse_addr)) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Starting of WebServer failed - opening of port %d hostname %s\n"), 
+                m_listen.get_port_number(), m_listen.get_host_name()));
+    }
 }
 
 WebServer::~WebServer()
