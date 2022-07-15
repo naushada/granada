@@ -1385,7 +1385,8 @@ WebServer::WebServer(std::string ipStr, ACE_UINT16 listenPort, ACE_UINT32 worker
     //mMongodbc = new MongodbClient(uri);
     mMongodbc = std::make_unique<MongodbClient>(uri);
 
-    ACE_NEW_NORETURN(m_semaphore, ACE_Semaphore());
+    //ACE_NEW_NORETURN(m_semaphore, ACE_Semaphore());
+    m_semaphore = std::make_unique<ACE_Semaphore>();
 
     m_workerPool.clear();
     std::uint32_t cnt;
@@ -1430,7 +1431,8 @@ WebServer::~WebServer()
         workerPool().clear();
     }
 
-    delete m_semaphore;
+    //delete m_semaphore;
+    m_semaphore.reset(nullptr);
 }
 
 bool WebServer::start()

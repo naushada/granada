@@ -199,7 +199,7 @@ class WebServer : public ACE_Event_Handler {
         }
 
         ACE_Semaphore& semaphore() const {
-            return(*m_semaphore);
+            return(*m_semaphore.get());
         }
 
     private:
@@ -213,7 +213,7 @@ class WebServer : public ACE_Event_Handler {
         std::vector<MicroService*>::iterator m_currentWorker;
         /* mongo db interface */
         std::unique_ptr<MongodbClient> mMongodbc;
-        ACE_Semaphore *m_semaphore;
+        std::unique_ptr<ACE_Semaphore> m_semaphore;
 
 };
 
