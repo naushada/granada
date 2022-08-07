@@ -725,4 +725,203 @@ std::int32_t MongodbClient::update_bulk_shipment(std::string bulkShipment)
 
 }
 */
+
+
+std::string MongodbClient::get_access_token_for_ajoul(std::string json_obj)
+{
+  //const bsoncxx::document::element
+  bsoncxx::document::view doc = bsoncxx::from_json(json_obj.c_str()).view();
+  
+  //bsoncxx::document::value doc(json_obj.c_str(), json_obj.length());
+  
+  auto it = doc.find("access_token");
+  if(it == doc.end()) {
+    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l Element access_token is not found\n")));
+    return(std::string());
+  }
+
+  //bsoncxx::document::element elm_value = doc["access_token"];
+  bsoncxx::document::element elm_value = *it;
+  //bsoncxx::document::view& doc
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the type is %d\n"), elm_value.type()));
+  if(elm_value && elm_value.type() == bsoncxx::type::k_utf8) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the length is %d\n"), elm_value.get_utf8().value.length()));
+    std::string res(elm_value.get_utf8().value.data(), elm_value.get_utf8().value.length());
+    return(res);
+  }
+  //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The access token is %s\n"), elm_value.get_utf8().value.data()));
+  return(std::string());
+}
+
+std::string MongodbClient::get_tracking_no_for_ajoul(std::string json_obj, std::string& reference_no)
+{
+  bsoncxx::document::value doc_val = bsoncxx::from_json(json_obj.c_str());
+  bsoncxx::document::view doc = doc_val.view();
+
+  auto it = doc.find("Shipment");
+  if(it == doc.end()) {
+    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l The Shipment object not found \n")));
+    return(std::string());    
+  }
+  
+  auto tt = it->get_document().value;
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the length is  %d value %s\n"), tt.length(), tt.data()));  
+  reference_no = tt["reference"].get_utf8().value.to_string();
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the reference is %s\n"), reference_no.c_str()));  
+
+  bsoncxx::document::element elm_value = doc["TrackingNumber"];
+
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the type is %d\n"), elm_value.type()));
+  if(elm_value && elm_value.type() == bsoncxx::type::k_utf8) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the length is %d\n"), elm_value.get_utf8().value.length()));
+    std::string res(elm_value.get_utf8().value.data(), elm_value.get_utf8().value.length());
+    return(res);
+  }
+  return(std::string());
+}
+
+#if 0
+std::string MongodbClient::get_tracking_no_for_ajoul(std::string json_obj, std::string& reference_no)
+{
+  //const bsoncxx::document::element
+  bsoncxx::document::value doc_val = bsoncxx::from_json(json_obj.c_str());
+  //auto doc = bsoncxx::from_json(json_obj.c_str()).view();
+  bsoncxx::document::view doc = doc_val.view();
+
+  if(doc.empty()) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The doc is empty\n")));
+  }
+
+
+  for(auto it = doc.begin(); it != doc.end(); ++it) {
+    if(it->type() == bsoncxx::type::k_document) {
+        for(auto subIt = it->get_document().value.begin(); subIt != it->get_document().value.end(); ++subIt) {
+            switch(subIt->type()) {
+                case bsoncxx::type::k_null:
+                    break;
+                case bsoncxx::type::k_utf8:
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The element is %s Key is %s\n"), subIt->get_utf8().value.data(), subIt->key().data()));
+                    break;
+                case bsoncxx::type::k_array:
+                case bsoncxx::type::k_binary:
+                case bsoncxx::type::k_bool:
+                case bsoncxx::type::k_date:
+                case bsoncxx::type::k_document:
+                case bsoncxx::type::k_double:
+                case bsoncxx::type::k_int32:
+                    break;
+            }
+        }
+    } else if(it->type() == bsoncxx::type::k_utf8) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The element is %s the key is %s\n"), it->get_utf8().value.data(), it->key().data()));
+    }
+  }
+
+
+#if 0
+  for(auto it = doc.begin(); it != doc.end(); ++it) {
+    if(it->type() == bsoncxx::type::k_document) {
+        auto elm = it->get_document().value;
+        auto elmIt = elm.find("Shipment");
+        if(elmIt != elm.end()) {
+            auto ent = *elmIt;
+
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The value of reference is %s\n"), ent["reference"]));
+            break;
+        }
+        elmIt = elm.find("TrackingNumber");
+        if(elmIt != elm.end()) {
+            auto ent = *elmIt;
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The Tracking Number is %s\n"), ent["TrackingNumber"]));
+        }
+    } else if(it->type() == bsoncxx::type::k_utf8) {
+        auto elmIt = it->get_utf8().value.to_string();
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The value k_utf8 is %s\n"), elmIt));
+    }
+  }
+#endif
+
+  //bsoncxx::document::value doc(json_obj.c_str(), json_obj.length());
+  auto it = doc.find("Shipment");
+  if(it == doc.end()) {
+    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l The Shipment object not found \n")));
+    return(std::string());    
+  }
+
+  //bsoncxx::document::element sub_doc = doc["Shipment"];
+
+  
+  auto tt = it->get_document().value;
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the length is  %d value %s\n"), tt.length(), tt.data()));  
+  reference_no = tt["reference"].get_utf8().value.to_string();
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the reference is %s\n"), reference_no.c_str()));  
+
+  bsoncxx::document::element elm_value = doc["TrackingNumber"];
+  //bsoncxx::document::view& doc
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the type is %d\n"), elm_value.type()));
+  if(elm_value && elm_value.type() == bsoncxx::type::k_utf8) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the length is %d\n"), elm_value.get_utf8().value.length()));
+    std::string res(elm_value.get_utf8().value.data(), elm_value.get_utf8().value.length());
+    return(res);
+  }
+  //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The access token is %s\n"), elm_value.get_utf8().value.data()));
+  return(std::string());
+}
+
+
+bool MongodbClient::is_key_found_in_document(bsoncxx::document::view doc, std::string key)
+{
+  std::find_if(doc.begin(), doc.end(), [&](auto elm) { return(elm.key().data() == key);});
+}
+
+std::string MongodbClient::get_key_value(bsoncxx::document::view doc, std::string key)
+{
+
+  for(auto it = doc.begin(); it != doc.end(); ++it) {
+    if(it->type() == bsoncxx::type::k_document) {
+      auto elm = it->get_document().value;
+      repeat:
+      if(is_key_found_in_document(elm, key)) {
+        for(auto foundIt = elm.begin(); foundIt != elm.end(); ++foundIt) {
+          switch(foundIt->type()) {
+            case bsoncxx::type::k_null:
+              break;
+            case bsoncxx::type::k_utf8: {
+              ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The element is %s Key is %s\n"), foundIt->get_utf8().value.data(), foundIt->key().data()));
+              if(foundIt->key().data() == key) {
+                std::string rsp(foundIt->get_utf8().value.data(), foundIt->get_utf8().value.length());
+                return(rsp);
+              }
+            }
+
+            case bsoncxx::type::k_array:
+            case bsoncxx::type::k_binary:
+            case bsoncxx::type::k_bool:
+            case bsoncxx::type::k_date:
+              break;
+            case bsoncxx::type::k_document: {
+              //return(get_key_value((*foundIt).get_document(), key));
+              elm = foundIt->get_document().value;
+              goto repeat;
+              //break;
+            }
+            case bsoncxx::type::k_double:
+            case bsoncxx::type::k_int32:
+              break;
+          }
+        }
+      }
+    }
+  }
+}
+
+std::string MongodbClient::get_value(std::string json_obj, std::string key)
+{
+  bsoncxx::document::value doc_val = bsoncxx::from_json(json_obj.c_str());
+  //auto doc = bsoncxx::from_json(json_obj.c_str()).view();
+  bsoncxx::document::view doc = doc_val.view();
+  return(get_key_value(doc, key));
+}
+#endif
+
 #endif /* __mongodbc_cc__*/

@@ -241,7 +241,11 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 return(build_responseERROR(err_message, err));
             }
         }
-    } else if(!uri.compare("/api/vendor/v1/ajoul/authorize")) {
+    } //else if(!uri.compare("/api/vendor/v1/ajoul/authorize")) {
+        else if(!uri.compare("/api/v1/ajoul/shipment/create")) {
+        //std::string req("{\"Shipment\":{\"reference\":\"AB100\",\"pickup_date\":null,\"pickup_time\":null,\"product_type\":\"104\",\"product_price\":null,\"destination\":\"RUH\",\"origin\":\"RUH\",\"parcel_quantity\":\"2\",\"parcel_weight\":\"4\",\"payment_mode\":\"COD\",\"service_id\":\"2\",\"description\":\"Testing Create Shipment From API\",\"sku\":\"423423\",\"customer_lng\":null,\"customer_lat\":null,\"sender\":{\"name\":\"Alaa\",\"address\":\"Al Haram street, Giza\",\"zip_code\":null,\"phone\":\"01063396459\",\"email\":\"admin@quadratechsoft.com\"},\"receiver\":{\"name\":\"Alaa\",\"address\":\"AL Malki, Damascuss\",\"zip_code\":\"1234\",\"phone\":\"0941951819\",\"phone2\":\"09419518549\",\"email\":\"info@quadratechsoft.com\"}},\"TrackingNumber\":\"AR222188000614391\",\"printLable\":\"https:\/\/ajoul.com\/printlabelone\/AR222188000614391\"}");
+        //std::string awbNo = dbInst.get_value(req, "TrackingNumber");
+        //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l TrackingNumber %s \n"), awbNo.c_str()));
         std::stringstream header("");
         //header = "Connection: close\r\n"
         //         "Cache-Control: no-cache\r\n";
@@ -266,13 +270,17 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
         apiAuthorizeAjoul << "client_secret=uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o" 
                           <<  "&client_id=34&username=AKjHYuCAco&password=uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o\r\n";*/
                             
-        header << "Accept: application/json\r\n"
+        header << "Host: www.ajoul.com\r\n"
+               << "Accept: application/json\r\n"
+               << "User-Agent: Balaagh/1.0\r\n"
                << "Connection: keep-alive\r\n"
                << "Cache-Control: no-cache\r\n"
                << "Content-Type: application/x-www-form-urlencoded\r\n"
-               <<  "Content-Length: " << apiAuthorizeAjoul.str().length()
-               << "\r\n"
-               <<  "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n";
+               << "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n"
+               //<<  "Content-Length: " << apiAuthorizeAjoul.str().length()
+               <<  "Content-Length: 0"
+               << "\r\n";
+               //<<  "Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW\r\n";
                
         //header << "\r\n";
 
@@ -297,10 +305,10 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                         connectAddr.get_ip_address(), connectAddr.get_host_addr()));
             
             std::stringstream postReq("");
-            postReq << "POST /remote/api/v1/authorize HTTP/1.1\r\n" 
+            postReq << "POST /remote/api/v1/authorize?client_secret=uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o&client_id=34&username=AKjHYuCAco&password=uCo9GJv4BATqU0C8491tTBooqY4CMttyg8kQyu1o HTTP/1.1\r\n" 
                                       << header.str()
-                                      << "\r\n" 
-                                      << apiAuthorizeAjoul.str();
+                                      << "\r\n"; 
+                                      //<< apiAuthorizeAjoul.str();
 
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the request is\n%s\n"), postReq.str().c_str()));
 
@@ -315,9 +323,9 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
 
                 ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Sent to https://ajoul.com is success\n")));
                 
-                std::array<std::uint8_t, 1024> authRsp;
+                std::array<std::uint8_t, 3048> authRsp;
                 authRsp.fill(0);
-                ssize_t len = conn.recv((void *)authRsp.data(), 1024, 0);
+                ssize_t len = conn.recv((void *)authRsp.data(), 3048, 0);
 
                 if(len < 0) {
                     ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l recv from ajoul:443 is failed\n")));
@@ -328,7 +336,80 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 } else {
                     std::string rsp((char *)authRsp.data(), len);    
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Response is - %s\n"), rsp.c_str()));
-                    return(build_responseOK(rsp));
+                    Http http(rsp);
+                    std::string access_token = dbInst.get_access_token_for_ajoul(http.body());
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The access_token is - %s\n"), access_token.c_str()));
+
+                    /* Now building request for creating shipment */
+                    std::stringstream shipmentCreate("");
+                    std::stringstream hdr("");
+                    
+                    shipmentCreate << "{"
+                                   << "\"receiver\":{"
+    << "\"name\":\"Alaa\","
+    << "\"country_code\": \"SA\","
+    << "\"city_code\": \"RUH\","
+    << "\"address\": \"AL Malki, Damascuss\","
+    << "\"zip_code\": \"1234\","
+    << "\"phone\": \"0941951819\","
+    << "\"phone2\": \"09419518549\","
+    << "\"email\": \"info@quadratechsoft.com\""
+    << "},"
+    << "\"sender\": {"
+    << "\"name\": \"Alaa\","
+    << "\"country_code\": \"SA\","
+    << "\"city_code\": \"RUH\","
+    << "\"address\": \"Al Haram street, Giza\","
+    << "\"phone\": \"01063396459\","
+    << "\"email\": \"admin@quadratechsoft.com\""
+    << "},"
+    << "\"reference\": \"AB100\","
+    << "\"pick_date\": \"2018-08-06\","
+    << "\"pickup_time\": \"12:49\","
+    << "\"product_type\": \"104\","
+    << "\"payment_mode\": \"COD\","
+    << "\"parcel_quantity\": \"2\","
+    << "\"parcel_weight\": \"4\","
+    << "\"service_id\": \"2\","
+    << "\"description\": \"Testing Create Shipment From API\","
+    << "\"sku\": \"423423\","
+    << "\"weight_total\": \"20\","
+    << "\"total_cod_amount\": 50.9"
+    << "}";
+                    hdr << "Host: www.ajoul.com\r\n"
+                        << "Accept: application/json\r\n"
+                        << "User-Agent: Balaagh/1.0\r\n"
+                        << "Connection: keep-alive\r\n"
+                        << "Cache-Control: no-cache\r\n"
+                        << "Content-Type: application/json\r\n"
+                        << "Authorization: Bearer " << access_token << "\r\n"
+                        <<  "Content-Length: " << shipmentCreate.str().length()
+                        << "\r\n\r\n"
+                        << shipmentCreate.str();
+                    postReq.str("");
+                    postReq << "POST /remote/api/v1/shipment/create HTTP/1.1\r\n"
+                            << hdr.str();
+                    if(conn.send_n(postReq.str().c_str(), postReq.str().length()) < 0) {
+
+                        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [worker:%t] %M %N:%l send to ajoul:443 is failed\n")));
+                        std::string err("400 Bad Request");
+                        std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"https://ajoul.com is not responding\", \"errorCode\" : 400}");
+                        return(build_responseERROR(err_message, err));
+
+                    } else {
+                        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Sent to https://ajoul.com is success\n")));
+                
+                        std::array<std::uint8_t, 3048> authRsp;
+                        authRsp.fill(0);
+                        ssize_t len = conn.recv((void *)authRsp.data(), 3048, 0);
+                        std::string rsp((char *)authRsp.data(), len);    
+                        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Response is - %s\n"), rsp.c_str()));
+                        Http http(rsp);
+                        std::string ref("");
+                        std::string awbNo = dbInst.get_tracking_no_for_ajoul(http.body(), ref);
+                        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The Tracking Number is - %s refNumber %s\n"), awbNo.c_str(), ref.c_str()));
+                    }
+                    return(build_responseOK(http.body()));
                 }
             }
         }

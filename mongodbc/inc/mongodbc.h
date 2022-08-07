@@ -63,6 +63,15 @@ class MongodbClient {
         std::int32_t create_bulk_document(std::string coll, std::string doc);
         std::string get_documentListEx(std::string collectionName, std::string query, std::string fieldProjection);
         std::int32_t create_bulk_documentEx(std::string coll, std::string doc);
+        /**
+         * @brief For vendor specific API 
+         * 
+         * @param json_obj 
+         * @return std::string 
+         */
+        std::string get_access_token_for_ajoul(std::string json_obj);
+        std::string get_tracking_no_for_ajoul(std::string json_obj, std::string& reference_no);
+        
 
     private:
         std::string mURI;
