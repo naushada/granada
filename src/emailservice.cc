@@ -1,0 +1,275 @@
+#ifndef __emailservice_cc__
+#define __emailservice_cc__
+
+#include "emailservice.hpp"
+
+SMTP::Client::Client(std::string addr, User* user)
+{
+  m_smtpServerAddress.set_address(addr.c_str(), addr.length());
+  m_user = user;
+}
+
+SMTP::Client::~Client()
+{
+
+}
+
+ACE_INT32 SMTP::Client::handle_timeout(const ACE_Time_Value &tv, const void *act)
+{
+
+}
+
+ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
+{
+  std::array<std::uint8_t, 2048> in;
+  in.fill(0);
+
+  auto ret = m_secureDataStream.recv(in.data(), in.size());
+
+  if(ret > 0) {
+    std::string ss((char *)in.data(), ret);
+    user().rx(ss);
+  }
+
+}
+
+ACE_INT32 SMTP::Client::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
+{
+
+}
+
+std::int32_t SMTP::Client::tx(const std::string in)
+{
+  std::int32_t txLen = -1;
+
+  if(m_mailServiceAvailable) {
+
+    txLen = m_secureDataStream.send_n(in.c_str(), in.length());
+
+    if(txLen < 0) {
+      ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l send_n to %s and port %u is failed for length %u\n"), 
+        m_smtpServerAddress.get_host_name(), m_smtpServerAddress.get_port_number(), in.length()));
+    }
+
+  }
+  return(txLen);
+}
+
+/**
+ * @brief This member function is invoked when remove_handler or any of handle_xxx returns -1
+ * 
+ * @param fd the handle to be closed
+ * @param mask mask of this handle
+ * @return ACE_INT32 always 0
+ */
+ACE_INT32 SMTP::Client::handle_close(ACE_HANDLE fd, ACE_Reactor_Mask mask)
+{
+  close(fd);
+  return(0);
+}
+
+/**
+ * @brief This member method is invoked when we invoke register_handle
+ * 
+ * @return ACE_HANDLE returns the registered handle
+ */
+ACE_HANDLE SMTP::Client::get_handle() const
+{
+  return(m_secureDataStream.get_handle());
+}
+
+/**
+ * @brief This function starts the SMTP client by establishing secure connection
+ * 
+ */
+void SMTP::Client::start()
+{
+  do {
+    if(m_secureSmtpServerConnection.connect(m_secureDataStream,m_smtpServerAddress) < 0) {
+      ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l connect to %s and port %u is failed\n"), 
+           m_smtpServerAddress.get_host_name(), m_smtpServerAddress.get_port_number()));
+      m_mailServiceAvailable = false;
+      break;
+    }
+
+    /* Feed this new handle to event Handler for read/write operation. */
+    ACE_Reactor::instance()->register_handler(m_secureDataStream.get_handle(), this, ACE_Event_Handler::READ_MASK |
+                                                                                     ACE_Event_Handler::TIMER_MASK |
+                                                                                     ACE_Event_Handler::SIGNAL_MASK);
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l The TLSClient is connected at handle %u\n"), m_secureDataStream.get_handle()));
+    m_mailServiceAvailable = true;
+
+    /* subscribe for signal */
+    ACE_Sig_Set ss;
+    ss.empty_set();
+    ss.sig_add(SIGINT);
+    ss.sig_add(SIGTERM);
+    ACE_Reactor::instance()->register_handler(&ss, this); 
+    
+    ACE_Time_Value to(1,0);
+
+    while(m_mailServiceAvailable) ACE_Reactor::instance()->handle_events(to);
+
+  }while(0);
+
+}
+
+void SMTP::Client::stop()
+{
+  ACE_Reactor::instance()->remove_handler(m_secureDataStream.get_handle(), ACE_Event_Handler::ACCEPT_MASK |
+                                                                           ACE_Event_Handler::TIMER_MASK |
+                                                                           ACE_Event_Handler::SIGNAL_MASK);
+
+}
+
+SMTP::User::~User()
+{
+
+}
+
+std::int32_t SMTP::User::startEmailTransaction()
+{
+  std::int32_t ret = 0;
+  std::string req;
+  m_client->tx(req);
+  m_fsm.set_state(MAIL());
+  return(ret);
+}
+
+std::int32_t SMTP::User::endEmailTransaction()
+{
+  std::int32_t ret = 0;
+  return(ret);
+}
+
+/**
+ * @brief This member method is invoked by SMTP client upon receipt of response from SMTP server
+ * 
+ * @param out response string from SMTP server
+ * @return std::int32_t returns > 0 upon success else less than 0
+ */
+std::int32_t SMTP::User::rx(std::string out)
+{
+  //auto stateType = decltype(m_fsm)
+  //auto idx = m_fsm.index();
+  m_fsm.onResponse(out);
+  //return(get_state().onResponse(out));
+}
+
+/**
+ * @brief This member function stores the email id for to list
+ * 
+ * @param toList list of email id for to list
+ */
+SMTP::User& SMTP::User::to(std::vector<std::string> toList)
+{
+  m_to = toList;
+  return(*this);
+}
+
+/**
+ * @brief This member function stores the email id for cc list
+ * 
+ * @param ccList list of email id for cc list
+ */
+SMTP::User& SMTP::User::cc(std::vector<std::string> ccList)
+{
+  m_cc = ccList;
+  return(*this);
+}
+
+/**
+ * @brief This member function stores the email id for bcc list
+ * 
+ * @param bccList list of email id for bcc list
+ */
+SMTP::User& SMTP::User::bcc(std::vector<std::string> bccList)
+{
+  m_bcc = bccList;
+  return(*this);
+}
+
+/**
+ * @brief This member function returns the list of email id of to list
+ * 
+ * @return std::vector<std::string>& list of email id for to list
+ */
+const std::vector<std::string>& SMTP::User::to() const
+{
+  return(m_to);
+}
+
+/**
+ * @brief This member function returns the list of email id of cc list
+ * 
+ * @return std::vector<std::string>& list of email id for cc list
+ */
+const std::vector<std::string>& SMTP::User::cc() const
+{
+  return(m_cc);
+}
+
+/**
+ * @brief This member function returns the list of email id of bcc list
+ * 
+ * @return std::vector<std::string>& list of email id for bcc list
+ */
+const std::vector<std::string>& SMTP::User::bcc() const
+{
+  return(m_bcc);
+}
+
+/**
+ * @brief This member function stores the subject of e-mail
+ * 
+ * @param subj email subject
+ */
+SMTP::User& SMTP::User::subject(std::string subj)
+{
+  m_subject = subj;
+  return(*this);
+}
+
+/**
+ * @brief This member function returns the subject of the e-mail
+ * 
+ * @return std::string& subject title of e-mail
+ */
+const std::string& SMTP::User::subject() const
+{
+  return(m_subject);
+}
+
+/**
+ * @brief This member function stores the e-mail body 
+ * 
+ * @param emailBody email body
+ */
+SMTP::User& SMTP::User::data(std::string emailBody)
+{
+  m_data = emailBody;
+  return(*this);
+}
+
+/**
+ * @brief This member function return the email body
+ * 
+ * @return std::string& email body
+ */
+const std::string& SMTP::User::data() const
+{
+  return(m_data);
+}
+
+void SMTP::User::client(std::unique_ptr<SMTP::Client> smtpClient)
+{
+  m_client = std::move(smtpClient);
+}
+
+const std::unique_ptr<SMTP::Client>& SMTP::User::client() const
+{
+  return(m_client);
+}
+
+#endif /* __emailservice_cc__ */
