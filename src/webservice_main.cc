@@ -2,6 +2,7 @@
 #define __webservice_main_cc__
 
 #include "webservice.h"
+#include "emailservice.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -112,6 +113,10 @@ int main(int argc, char* argv[])
                   std::get<std::size_t(CommandArgumentName::DB_URI)>(cmdOpt),
                   std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt),
                   std::get<std::size_t(CommandArgumentName::DB_NAME)>(cmdOpt));
+
+    SMTP::User email;
+    email.startEmailTransaction();
+
    inst.start();
 
    return(0);

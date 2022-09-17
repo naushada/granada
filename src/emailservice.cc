@@ -3,38 +3,68 @@
 
 #include "emailservice.hpp"
 
-SMTP::Client::Client(std::string addr, User* user)
+SMTP::Client::Client(ACE_UINT16 port, std::string addr, User* user) : m_smtpServerAddress(port, addr.c_str()),
+  m_secureSmtpServerConnection(m_secureDataStream, m_smtpServerAddress),m_mb(nullptr),m_mailServiceAvailable(false),
+  m_user(user)
 {
-  m_smtpServerAddress.set_address(addr.c_str(), addr.length());
-  m_user = user;
+  m_semaphore = std::make_unique<ACE_Semaphore>();
 }
 
 SMTP::Client::~Client()
 {
+  m_semaphore.reset(nullptr);
+}
 
+int SMTP::Client::svc(void) {
+  m_semaphore->release();
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l semaphore is released and going into main-loop\n")));
+  main();
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l active object is stopped now\n")));
+}
+
+int SMTP::Client::open(void *args) {
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l active object is spawned\n")));
+  activate();
+  return(0);
+}
+
+int SMTP::Client::close(u_long flags) {
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l active object is closed now\n")));
+  return(0);
 }
 
 ACE_INT32 SMTP::Client::handle_timeout(const ACE_Time_Value &tv, const void *act)
 {
-
+  return(0);
 }
 
 ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
 {
   std::array<std::uint8_t, 2048> in;
   in.fill(0);
-
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l response has come from SMTP server handle:%u\n"), handle));
   auto ret = m_secureDataStream.recv(in.data(), in.size());
 
   if(ret > 0) {
     std::string ss((char *)in.data(), ret);
-    user().rx(ss);
+    /// @brief feed to FSm for processing of incoming request
+    user().fsm().onResponse(ss);
+  } else {
+    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l handle_input failed\n")));
   }
 
+  /// @return upon success returns zero meaning middleware will continue the reactor loop else it breaks the loop
+  return(0);
 }
 
 ACE_INT32 SMTP::Client::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 {
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Signal Number %d and its name %S is received for emailservice\n"), signum, signum));
+  ACE_Reactor::instance()->remove_handler(m_secureDataStream.get_handle(), 
+                                                         ACE_Event_Handler::ACCEPT_MASK | 
+                                                         ACE_Event_Handler::TIMER_MASK | 
+                                                         ACE_Event_Handler::SIGNAL_MASK);
+  return(-1);
 
 }
 
@@ -51,6 +81,7 @@ std::int32_t SMTP::Client::tx(const std::string in)
         m_smtpServerAddress.get_host_name(), m_smtpServerAddress.get_port_number(), in.length()));
     }
 
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l successfully sent of length %d on handle %u\n"), in.length(), m_secureDataStream.get_handle()));
   }
   return(txLen);
 }
@@ -85,34 +116,39 @@ ACE_HANDLE SMTP::Client::get_handle() const
 void SMTP::Client::start()
 {
   do {
-    if(m_secureSmtpServerConnection.connect(m_secureDataStream,m_smtpServerAddress) < 0) {
-      ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l connect to %s and port %u is failed\n"), 
+    if(m_secureSmtpServerConnection.connect(m_secureDataStream, m_smtpServerAddress) < 0) {
+      ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l connect to host-name:%s and port-number:%u is failed\n"), 
            m_smtpServerAddress.get_host_name(), m_smtpServerAddress.get_port_number()));
       m_mailServiceAvailable = false;
       break;
     }
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l connect host-name:%s, ip-address:%s and port:%u is success\n"), 
+           m_smtpServerAddress.get_host_name(),m_smtpServerAddress.get_host_addr(), m_smtpServerAddress.get_port_number()));
 
     /* Feed this new handle to event Handler for read/write operation. */
     ACE_Reactor::instance()->register_handler(m_secureDataStream.get_handle(), this, ACE_Event_Handler::READ_MASK |
                                                                                      ACE_Event_Handler::TIMER_MASK |
                                                                                      ACE_Event_Handler::SIGNAL_MASK);
 
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l The TLSClient is connected at handle %u\n"), m_secureDataStream.get_handle()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l The emailservice is connected at handle:%u\n"), m_secureDataStream.get_handle()));
     m_mailServiceAvailable = true;
 
     /* subscribe for signal */
-    ACE_Sig_Set ss;
     ss.empty_set();
     ss.sig_add(SIGINT);
     ss.sig_add(SIGTERM);
-    ACE_Reactor::instance()->register_handler(&ss, this); 
-    
-    ACE_Time_Value to(1,0);
-
-    while(m_mailServiceAvailable) ACE_Reactor::instance()->handle_events(to);
+    ACE_Reactor::instance()->register_handler(&ss, this);
+    // spawn an active object for waiting on reactor
+    open();
 
   }while(0);
 
+}
+
+void SMTP::Client::main() {
+    ACE_Time_Value to(1,0);
+    while(m_mailServiceAvailable) ACE_Reactor::instance()->handle_events(to);
 }
 
 void SMTP::Client::stop()
@@ -125,15 +161,18 @@ void SMTP::Client::stop()
 
 SMTP::User::~User()
 {
-
+  m_client.reset(nullptr);
 }
 
 std::int32_t SMTP::User::startEmailTransaction()
 {
   std::int32_t ret = 0;
   std::string req;
-  m_client->tx(req);
-  m_fsm.set_state(MAIL());
+  m_client->start();
+  m_client->m_semaphore->acquire();
+  //m_client->tx(req);
+  //m_fsm.set_state(MAIL());
+  
   return(ret);
 }
 

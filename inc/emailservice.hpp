@@ -27,14 +27,18 @@
 #include "ace/Semaphore.h"
 
 namespace SMTP {
-  std::unordered_map<std::uint32_t, std::string> statusCodeUMap;
   class User;
 
-  class Client : public ACE_Event_Handler {
+  class Client : public ACE_Task<ACE_MT_SYNCH> {
 
     public:
-      Client(std::string smtpAddress, User* user);
+      Client(ACE_UINT16 port, std::string smtpAddress, User* user);
       ~Client();
+
+      int svc(void) override;
+      int open(void *args=0) override;
+      int close (u_long flags=0) override;
+
       ACE_INT32 handle_timeout(const ACE_Time_Value &tv, const void *act=0) override;
       ACE_INT32 handle_input(ACE_HANDLE handle) override;
       ACE_INT32 handle_signal(int signum, siginfo_t *s = 0, ucontext_t *u = 0) override;
@@ -42,6 +46,8 @@ namespace SMTP {
       ACE_HANDLE get_handle() const override;
       void start();
       void stop();
+      void main();
+
       std::int32_t tx(const std::string in);
       std::int32_t rx(std::string &out);
       User& user() {
@@ -55,32 +61,41 @@ namespace SMTP {
       ACE_Message_Block *m_mb;
       bool m_mailServiceAvailable;
       User *m_user;
+      ACE_Sig_Set ss;
+      std::unique_ptr<ACE_Semaphore> m_semaphore;
   };
 
   template<typename ST>
   class Transaction {
     public:
+
       Transaction() = default;
       ~Transaction() = default;
 
       template<typename... Args>
       void set_state(auto new_state, Args... args) {
 
-        std::visit([&](auto arg) -> void {
-          arg.onExit(args...);
+        std::visit([&](auto st) -> void {
+            st.onExit(args...);
           }, m_state);
 
         m_state = std::move(new_state);
 
-        std::visit([&](auto arg) -> void {
-          arg.onEntry(args...);
+        std::visit([&](auto st) -> void {
+            st.onEntry(args...);
           }, m_state);
+      }
+
+      auto get_state() {
+        std::visit([&](auto st) {
+          return(st);
+        }, m_state);
       }
 
       std::int32_t onResponse(std::string in)
       {
-        std::visit([&](auto arg) -> std::int32_t {
-          return(arg.onResponse(in));
+        std::visit([&](auto st) -> std::int32_t {
+            return(st.onResponse(in));
           }, m_state);
       }
 
@@ -258,8 +273,10 @@ namespace SMTP {
   class User {
     public:
       User() {
-        m_client = std::make_unique<Client>("smtp.gmail.com:465", this);
+        //m_client = std::make_unique<Client>(/*"smtp.gmail.com:465"*/"142.251.12.108:465", this);
+        m_client = std::make_unique<Client>(465, "smtp.gmail.com", this);
 
+        
       }
 
       ~User();
@@ -331,6 +348,10 @@ namespace SMTP {
       std::int32_t rx(std::string out);
       Account& account() {
         return(m_account);
+      }
+
+      auto& fsm() {
+        return(m_fsm);
       }
 
     private:
