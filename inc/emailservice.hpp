@@ -58,6 +58,8 @@ namespace SMTP {
       ACE_INET_Addr m_smtpServerAddress;
       ACE_SSL_SOCK_Connector m_secureSmtpServerConnection;
       ACE_SSL_SOCK_Stream m_secureDataStream;
+      //ACE_SOCK_Connector m_secureSmtpServerConnection;
+      //ACE_SOCK_Stream m_secureDataStream;
       ACE_Message_Block *m_mb;
       bool m_mailServiceAvailable;
       User *m_user;
@@ -122,7 +124,7 @@ namespace SMTP {
       }
 
       std::int32_t onResponse(std::string in) {
-      
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
         return(0);
       }
 
@@ -150,7 +152,7 @@ namespace SMTP {
       }
 
       std::int32_t onResponse(std::string in) {
-      
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:RCPT receive length:%d response:%s\n"), in.length(), in.c_str()));
         return(0);
       }
 
@@ -179,7 +181,7 @@ namespace SMTP {
       }
 
       std::int32_t onResponse(std::string in) {
-      
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:DATA receive length:%d response:%s\n"), in.length(), in.c_str()));
         return(0);
       }
 
@@ -206,7 +208,7 @@ namespace SMTP {
 
       }
       std::int32_t onResponse(std::string in) {
-      
+         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:INIT receive length:%d response:%s\n"), in.length(), in.c_str()));
         return(0);
       }
 
@@ -273,6 +275,7 @@ namespace SMTP {
   class User {
     public:
       User() {
+        /// For secure smtp the port is 465 and plain smtp the port is 25.
         //m_client = std::make_unique<Client>(/*"smtp.gmail.com:465"*/"142.251.12.108:465", this);
         m_client = std::make_unique<Client>(465, "smtp.gmail.com", this);
 
