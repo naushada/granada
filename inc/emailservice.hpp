@@ -28,6 +28,11 @@
 
 namespace SMTP {
   class User;
+  class INIT;
+  class MAIL;
+  class RCPT;
+  class DATA;
+  using States = std::variant<INIT, MAIL, RCPT, DATA>;
 
   class Client : public ACE_Task<ACE_MT_SYNCH> {
 
@@ -101,9 +106,11 @@ namespace SMTP {
           }, m_state);
       }
 
-      std::int32_t onRequest(std::string in) 
+      void onRx(std::string in, std::string& out, ST& new_state) 
       {
-        return(0);
+          std::visit([&](auto&& active_st) -> void {
+              active_st.onRequest(in, out, new_state);
+          }, m_state);
       }
 
     private:
@@ -115,27 +122,11 @@ namespace SMTP {
       MAIL() = default;
       ~MAIL() = default;
 
-      void onEntry() {
-
-      }
-
-      void onExit() {
-
-      }
-
-      std::int32_t onResponse(std::string in) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
-        return(0);
-      }
-
-      std::int32_t onResponse() {
-      
-        return(0);
-      }
-
-      std::int32_t onRequest(std::string in) {
-        return(0);
-      }
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class RCPT {
@@ -143,56 +134,23 @@ namespace SMTP {
       RCPT() = default;
       ~RCPT() = default;
 
-      void onEntry() {
-
-      }
-
-      void onExit() {
-
-      }
-
-      std::int32_t onResponse(std::string in) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:RCPT receive length:%d response:%s\n"), in.length(), in.c_str()));
-        return(0);
-      }
-
-      std::int32_t onResponse() {
-      
-        return(0);
-      }
-
-      std::int32_t onRequest(std::string in) {
-        return(0);
-      }
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class DATA {
     public:
       DATA() = default;
-
       ~DATA() = default;
 
-      void onEntry() {
-
-      }
-
-      void onExit() {
-
-      }
-
-      std::int32_t onResponse(std::string in) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:DATA receive length:%d response:%s\n"), in.length(), in.c_str()));
-        return(0);
-      }
-
-      std::int32_t onResponse() {
-      
-        return(0);
-      }
-
-      std::int32_t onRequest(std::string in) {
-        return(0);
-      }
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class INIT {
@@ -200,29 +158,14 @@ namespace SMTP {
       INIT() = default;
       ~INIT() = default;
 
-      void onEntry() {
-
-      }
-
-      void onExit() {
-
-      }
-      std::int32_t onResponse(std::string in) {
-         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:INIT receive length:%d response:%s\n"), in.length(), in.c_str()));
-        return(0);
-      }
-
-      std::int32_t onResponse() {
-      
-        return(0);
-      }
-
-      std::int32_t onRequest(std::string in) {
-        return(0);
-      }
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
   };
 
-  using States = std::variant<INIT, MAIL, RCPT, DATA>;
+  
 
   class Account {
     public:

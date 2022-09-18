@@ -49,9 +49,17 @@ ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
   if(ret > 0) {
 
     std::string ss((char *)in.data(), ret);
+    std::string out("");
+    SMTP::States new_state;
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l receive length:%d response:%s\n"), ret, ss.c_str()));
+    
     /// @brief feed to FSm for processing of incoming request
-    user().fsm().onResponse(ss);
+    user().fsm().onRx(ss, out, new_state);
+
+    /// @brief  send the response for received request.
+    ret = m_secureDataStream.send_n(out.c_str(), out.length());
+    /// @brief  move to new state for processing of next Request.
+    user().fsm().set_state(new_state);
 
   } else {
 
