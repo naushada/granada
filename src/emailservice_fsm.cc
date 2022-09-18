@@ -13,6 +13,7 @@
  */
 
 #include "emailservice.hpp"
+#include <sstream>
 
 void SMTP::INIT::onEntry()
 {
@@ -35,8 +36,20 @@ std::int32_t SMTP::INIT::onResponse()
     return(0);
 }
 
+/**
+ * @brief This member method processes the incoming initial command from smtp server and sends EHLO - Extension Hello
+ * 
+ * @param in Greeting or Extension capabilities from smtp server
+ * @param out response message to be sent to smtp server
+ * @param new_state new state for processing of Extention cabalities 
+ */
 void SMTP::INIT::onRequest(std::string in, std::string& out, States& new_state)
 {
+    std::stringstream ss("");
+    ss << "EHLO gmail.com" << "\r\n";
+    /// @brief modifiying out with response message to be sent to smtp server 
+    out = ss.str();
+    /// @brief moving to new state for processing of new command or request 
     new_state = MAIL{};
 }
 
@@ -63,7 +76,49 @@ std::int32_t SMTP::DATA::onResponse()
 
 void SMTP::DATA::onRequest(std::string in, std::string& out, States& new_state)
 {
-    new_state = INIT{};
+
+    std::stringstream ss("");
+    ss << "DATA" << "\r\n";
+    /// @brief modifiying out with response message to be sent to smtp server 
+    out = ss.str();
+ 
+    new_state = BODY{};
+}
+
+void SMTP::BODY::onEntry()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+void SMTP::BODY::onExit()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+std::int32_t SMTP::BODY::onResponse(std::string in)
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY receive length:%d response:%s\n"), in.length(), in.c_str()));
+    return(0);
+}
+
+std::int32_t SMTP::BODY::onResponse()
+{
+    return(0);
+}
+
+void SMTP::BODY::onRequest(std::string in, std::string& out, States& new_state)
+{
+
+    std::stringstream ss("");
+    ss << "This is fromemail service " << "\r\n"
+       << "This is line1 " << "\r\n"
+       << "This is line2 " << "\r\n"
+       << "." <<"\r\n";
+
+    /// @brief modifiying out with response message to be sent to smtp server 
+    out = ss.str();
+ 
+    new_state = QUIT{};
 }
 
 void SMTP::RCPT::onEntry()
@@ -89,10 +144,14 @@ std::int32_t SMTP::RCPT::onResponse()
 
 void SMTP::RCPT::onRequest(std::string in, std::string& out, States& new_state)
 {
+
+    std::stringstream ss("");
+    ss << "RCPT TO:<naushad.dln@gmail.com>" << "\r\n";
+    /// @brief modifiying out with response message to be sent to smtp server 
+    out = ss.str();
     new_state = DATA{};
     
 }
-
 
 void SMTP::MAIL::onEntry()
 {
@@ -117,6 +176,185 @@ std::int32_t SMTP::MAIL::onResponse()
 }
 
 void SMTP::MAIL::onRequest(std::string in, std::string& out, States& new_state)
+{
+    std::stringstream ss("");
+    ss << "MAIL FROM:<naushad.dln@gmail.com>" << "\r\n";
+    /// @brief modifiying out with response message to be sent to smtp server 
+    out = ss.str();
+    new_state = RCPT{};
+
+}
+
+void SMTP::QUIT::onEntry()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:QUIT function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+void SMTP::QUIT::onExit()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:QUIT function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+std::int32_t SMTP::QUIT::onResponse(std::string in)
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
+    
+    return(0);
+}
+
+std::int32_t SMTP::QUIT::onResponse()
+{
+    return(0);
+}
+
+void SMTP::QUIT::onRequest(std::string in, std::string& out, States& new_state)
+{
+
+    std::stringstream ss("");
+    ss << "QUIT" << "\r\n";
+    /// @brief modifiying out with response message to be sent to smtp server 
+    out = ss.str();
+
+    new_state = INIT{};
+
+}
+
+void SMTP::RESET::onEntry()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:RESET function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+void SMTP::RESET::onExit()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:RESET function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+std::int32_t SMTP::RESET::onResponse(std::string in)
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
+    
+    return(0);
+}
+
+std::int32_t SMTP::RESET::onResponse()
+{
+    return(0);
+}
+
+void SMTP::RESET::onRequest(std::string in, std::string& out, States& new_state)
+{
+    new_state = INIT{};
+
+}
+
+void SMTP::VRFY::onEntry()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:VRFY function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+void SMTP::VRFY::onExit()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:VRFY function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+std::int32_t SMTP::VRFY::onResponse(std::string in)
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
+    
+    return(0);
+}
+
+std::int32_t SMTP::VRFY::onResponse()
+{
+    return(0);
+}
+
+void SMTP::VRFY::onRequest(std::string in, std::string& out, States& new_state)
+{
+    new_state = INIT{};
+
+}
+
+
+void SMTP::NOOP::onEntry()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:NOOP function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+void SMTP::NOOP::onExit()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:NOOP function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+std::int32_t SMTP::NOOP::onResponse(std::string in)
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
+    
+    return(0);
+}
+
+std::int32_t SMTP::NOOP::onResponse()
+{
+    return(0);
+}
+
+void SMTP::NOOP::onRequest(std::string in, std::string& out, States& new_state)
+{
+    new_state = INIT{};
+
+}
+
+void SMTP::EXPN::onEntry()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::EXPN function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+void SMTP::EXPN::onExit()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::EXPN function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+std::int32_t SMTP::EXPN::onResponse(std::string in)
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
+    
+    return(0);
+}
+
+std::int32_t SMTP::EXPN::onResponse()
+{
+    return(0);
+}
+
+void SMTP::EXPN::onRequest(std::string in, std::string& out, States& new_state)
+{
+    new_state = INIT{};
+
+}
+
+void SMTP::HELP::onEntry()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::HELP function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+void SMTP::HELP::onExit()
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::HELP function:%s\n"), __PRETTY_FUNCTION__));
+}
+
+std::int32_t SMTP::HELP::onResponse(std::string in)
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
+    
+    return(0);
+}
+
+std::int32_t SMTP::HELP::onResponse()
+{
+    return(0);
+}
+
+void SMTP::HELP::onRequest(std::string in, std::string& out, States& new_state)
 {
     new_state = INIT{};
 

@@ -27,13 +27,24 @@
 #include "ace/Semaphore.h"
 
 namespace SMTP {
+  /// @brief Forward declaration of classes
   class User;
   class INIT;
   class MAIL;
   class RCPT;
   class DATA;
-  using States = std::variant<INIT, MAIL, RCPT, DATA>;
+  class QUIT;
+  class BODY;
+  class HELP;
+  class NOOP;
+  class VRFY;
+  class EXPN;
+  class RESET;
 
+  /// @brief For new state, add into this variant 
+  using States = std::variant<INIT, MAIL, RCPT, DATA, QUIT, BODY, HELP, NOOP, VRFY, EXPN, RESET>;
+  
+  /// @brief the Client instance will be active object
   class Client : public ACE_Task<ACE_MT_SYNCH> {
 
     public:
@@ -71,7 +82,12 @@ namespace SMTP {
       ACE_Sig_Set ss;
       std::unique_ptr<ACE_Semaphore> m_semaphore;
   };
-
+  /*  _ ___
+   * ||   ||
+   * ||_ _//
+   * ||   \\
+   * ||    \\
+   */
   template<typename ST>
   class Transaction {
     public:
@@ -153,6 +169,17 @@ namespace SMTP {
       void onRequest(std::string in, std::string& out, States& new_state);
   };
 
+  class BODY {
+    public:
+      BODY() = default;
+      ~BODY() = default;
+
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
+  };
   class INIT {
     public:
       INIT() = default;
@@ -165,7 +192,77 @@ namespace SMTP {
       void onRequest(std::string in, std::string& out, States& new_state);
   };
 
-  
+  class QUIT {
+    public:
+      QUIT() = default;
+      ~QUIT() = default;
+
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
+  };
+
+  class RESET {
+    public:
+      RESET() = default;
+      ~RESET() = default;
+
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
+  };
+
+  class VRFY {
+    public:
+      VRFY() = default;
+      ~VRFY() = default;
+
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
+  };
+
+  class NOOP {
+    public:
+      NOOP() = default;
+      ~NOOP() = default;
+
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
+  };
+
+  class EXPN {
+    public:
+      EXPN() = default;
+      ~EXPN() = default;
+
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
+  };
+
+  class HELP {
+    public:
+      HELP() = default;
+      ~HELP() = default;
+
+      void onEntry();
+      void onExit();
+      std::int32_t onResponse(std::string in);
+      std::int32_t onResponse();
+      void onRequest(std::string in, std::string& out, States& new_state);
+  };
 
   class Account {
     public:
