@@ -6,6 +6,7 @@
 #include<unordered_map>
 #include <variant>
 #include <type_traits>
+#include <optional>
 
 #include "ace/Reactor.h"
 #include "ace/Basic_Types.h"
@@ -25,6 +26,8 @@
 #include "ace/SSL/SSL_SOCK_Stream.h"
 #include "ace/SSL/SSL_SOCK_Connector.h"
 #include "ace/Semaphore.h"
+#include "ace/Codecs.h"
+
 
 namespace SMTP {
   /// @brief Forward declaration of classes
@@ -122,11 +125,13 @@ namespace SMTP {
           }, m_state);
       }
 
-      void onRx(std::string in, std::string& out, ST& new_state) 
+      std::uint32_t onRx(std::string in, std::string& out, ST& new_state) 
       {
+          std::int32_t ret_status;
           std::visit([&](auto&& active_st) -> void {
-              active_st.onRequest(in, out, new_state);
+              ret_status = active_st.onRequest(in, out, new_state);
           }, m_state);
+        return(ret_status);
       }
 
     private:
@@ -134,15 +139,30 @@ namespace SMTP {
   };
 
   class MAIL {
+    enum AuthSteps : std::uint32_t {
+      AUTH_INIT,
+      AUTH_USRNAME,
+      AUTH_PASSWORD,
+      AUTH_SUCCESS,
+      AUTH_FAILURE
+    };
+
+    AuthSteps m_authStage;
+
     public:
-      MAIL() = default;
+      MAIL() : m_authStage(AUTH_INIT) {
+
+      }
+
       ~MAIL() = default;
 
       void onEntry();
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onUsername(const std::string in, std::string& base64Username);
+      std::uint32_t onPassword(const std::string in, std::string& base64Password);
   };
 
   class RCPT {
@@ -154,7 +174,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class DATA {
@@ -166,7 +186,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class BODY {
@@ -178,7 +198,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
   class INIT {
     public:
@@ -189,7 +209,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class QUIT {
@@ -201,7 +221,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class RESET {
@@ -213,7 +233,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class VRFY {
@@ -225,7 +245,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class NOOP {
@@ -237,7 +257,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class EXPN {
@@ -249,7 +269,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class HELP {
@@ -261,7 +281,7 @@ namespace SMTP {
       void onExit();
       std::int32_t onResponse(std::string in);
       std::int32_t onResponse();
-      void onRequest(std::string in, std::string& out, States& new_state);
+      std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
   };
 
   class Account {
@@ -319,7 +339,8 @@ namespace SMTP {
         //m_client = std::make_unique<Client>(/*"smtp.gmail.com:465"*/"142.251.12.108:465", this);
         m_client = std::make_unique<Client>(465, "smtp.gmail.com", this);
 
-        
+        account().email("naushad.dln@gmail.com").name("Naushad Ahmed")
+                 .password("Pin@232326").userid("naushad.dln");
       }
 
       ~User();

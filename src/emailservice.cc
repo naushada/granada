@@ -51,20 +51,23 @@ ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
     std::string ss((char *)in.data(), ret);
     std::string out("");
     SMTP::States new_state;
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l receive length:%d response:%s\n"), ret, ss.c_str()));
-    
-    /// @brief feed to FSm for processing of incoming request
-    user().fsm().onRx(ss, out, new_state);
 
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l receive length:%d response:%s\n"), ret, ss.c_str()));
+
+    /// @brief feed to FSm for processing of incoming request
+    auto nxtAction = user().fsm().onRx(ss, out, new_state);
     /// @brief  send the response for received request.
     ret = m_secureDataStream.send_n(out.c_str(), out.length());
-    /// @brief  move to new state for processing of next Request.
-    user().fsm().set_state(new_state);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent length:%d command:%s\n"), ret, out.c_str()));
 
+    if(nxtAction) {
+        /// @brief  move to new state for processing of next Request.
+        user().fsm().set_state(new_state);
+    }
+    
   } else {
-
     ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l handle_input failed\n")));
-
+    return(-1);
   }
 
   /// @return upon success returns zero meaning middleware will continue the reactor loop else it breaks the loop
@@ -109,6 +112,7 @@ std::int32_t SMTP::Client::tx(const std::string in)
  */
 ACE_INT32 SMTP::Client::handle_close(ACE_HANDLE fd, ACE_Reactor_Mask mask)
 {
+  m_mailServiceAvailable = false;
   close(fd);
   return(0);
 }
