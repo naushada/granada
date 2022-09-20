@@ -326,7 +326,7 @@ std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Us
         if(plain) {
             std::string usrName((char *)plain, out_len);
             if(!usrName.compare("Password:")) {
-                std::string nm("Pin@232326");
+                std::string nm("");
                 const ACE_Byte* out = (unsigned char *)nm.data();
                 out_len = 0;
                 ACE_Byte* encName = ACE_Base64::encode(out, nm.length(), &out_len);
