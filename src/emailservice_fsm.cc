@@ -36,52 +36,31 @@ std::uint32_t parseSmtpCommand(const std::string in, std::vector<std::string>& o
     std::int32_t c;
     std::string elm("");
     out.clear();
-
+    
     std::cout << "Request:" << in << std::endl;
 
     while((c = input.get()) != EOF) {
         switch(c) {
             case ' ':
-            case '-':
             {
+                out.push_back(elm);
                 auto cc = input.get();
                 elm.clear();
+
                 while(cc != '\r') {
                     elm.push_back(cc);
                     cc = input.get();
                 }
+                /* get rid of '\n' */
+                cc = input.get();
                 out.push_back(elm);
-                std::cout << elm << std::endl;
+                elm.clear();
             }
-            break;
-
-            case '\n':
             break;
 
             default:
             {
-                std::array<uint8_t, 8>statusWord;
-                statusWord.fill(0);
-
-                statusWord[0] = input.get();
-                statusWord[1] = input.get();
-                statusWord[2] = input.get();
-                statusWord[3] = input.get();
-
-                if((' ' == std::get<3>(statusWord)) ||('-' == std::get<3>(statusWord))) {
-                    /// @brief put back last character to input stream. 
-                    input.unget();
-
-                    /// @brief This is the last status work, get its value now.
-                    std::string status("") ;
-                    
-                    status.push_back(std::get<0>(statusWord));
-                    status.push_back(std::get<1>(statusWord));
-                    status.push_back(std::get<2>(statusWord));
-
-                    out.push_back(status);
-                    std::cout << "status-word:" << out.at(0) << std::endl;
-                }
+                elm.push_back(c);
             }
             break;
         }
@@ -270,20 +249,8 @@ std::int32_t SMTP::MAIL::onResponse()
 std::uint32_t SMTP::MAIL::onRequest(std::string in, std::string& out, States& new_state)
 {
     std::stringstream ss("");
-    std::vector<std::string> commandName;
-    commandName.clear();
-
-    #if 0
-    auto ret = parseSmtpCommand(in, commandName);
-
-    for(auto& st: commandName) {
-        std::cout << st << std::endl;
-    }
-    #endif
-
+    
     if(AUTH_INIT == m_authStage) {
-        std::string b64Out("");
-        //getBase64("Username:Naushad Ahmed", b64Out);
         ss << "MAIL FROM:<naushad.dln@gmail.com>" << "\r\n"
            << "AUTH LOGIN" << "\r\n";
         /// @brief modifiying out with response message to be sent to smtp server 
@@ -292,23 +259,15 @@ std::uint32_t SMTP::MAIL::onRequest(std::string in, std::string& out, States& ne
         
         return(0);
     } else if(AUTH_USRNAME == m_authStage) {
-        auto ret = parseSmtpCommand(in, commandName);
-
-        for(auto& st: commandName) {
-            std::cout << st << std::endl;
+        if(!onUsername(in, out)) {
+            m_authStage = AUTH_PASSWORD;
         }
-        onUsername(commandName.at(1), out);
-        m_authStage = AUTH_PASSWORD;
         return(0);
-    } else if(AUTH_PASSWORD == m_authStage) {
-        auto ret = parseSmtpCommand(in, commandName);
 
-        for(auto& st: commandName) {
-            std::cout << st << std::endl;
+    } else if(AUTH_PASSWORD == m_authStage) {
+        if(!onPassword(in, out)) { 
+            m_authStage = AUTH_SUCCESS;
         }
-        onPassword(commandName.at(1), out);
-        m_authStage = AUTH_SUCCESS;
-        return(1);
     }
 
     new_state = RCPT{};
@@ -318,26 +277,25 @@ std::uint32_t SMTP::MAIL::onRequest(std::string in, std::string& out, States& ne
 std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Username)
 {
     size_t out_len = 0;
-    const ACE_Byte* data = (ACE_Byte *)in.data();
-    #if 0
-    std::string nm("naushad.dln@gmail.com");
-            const ACE_Byte* out = (unsigned char *)nm.data();
-            out_len = 0;
-            ACE_Byte* encName = ACE_Base64::encode(out, nm.length(), &out_len);
-            std::string b64_((char *)encName, out_len);
-            std::stringstream ss("");
-            ss << "AUTH LOGIN "<< b64_ << "\r\n";
-            base64Username = ss.str();
-    return(0);
-    #endif
+    
     std::vector<std::string> commandList;
     auto ret = parseSmtpCommand(in, commandList);
     auto statusCode = std::stoi(commandList.at(0));
+    for(auto& ss: commandList) {
+        std::cout << ss << std::endl;
+    }
+
     if(334 == statusCode) {
+        std::cout << "0.StatusCode" << statusCode << std::endl;
+        const ACE_Byte* data = (ACE_Byte *)(commandList.at(1)).data();
         ACE_Byte* plain = ACE_Base64::decode(data, &out_len);
+
         if(plain) {
             std::string usrName((char *)plain, out_len);
+            std::cout << "1.Username:" << usrName << std::endl;
+
             if(!usrName.compare("Username:")) {
+                std::cout << "2.Username:" << usrName << std::endl;
                 std::string nm("naushad.dln@gmail.com");
                 const ACE_Byte* out = (unsigned char *)nm.data();
                 out_len = 0;
@@ -350,30 +308,37 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
             }
         }
     }
-    return(0);
+    return(1);
 }
 
 std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Username)
 {
     size_t out_len = 0;
-    const ACE_Byte* data = (ACE_Byte *)in.data();
+    
+    std::vector<std::string> commandList;
+    auto ret = parseSmtpCommand(in, commandList);
+    auto statusCode = std::stoi(commandList.at(0));
+   
+    if(334 == statusCode) {
+        const ACE_Byte* data = (ACE_Byte *)(commandList.at(1)).data();
+        ACE_Byte* plain = ACE_Base64::decode(data, &out_len);
 
-    ACE_Byte* plain = ACE_Base64::decode(data, &out_len);
-    if(plain) {
-        std::string usrName((char *)plain, out_len);
-        if(!usrName.compare("Password:")) {
-            std::string nm("");
-            const ACE_Byte* out = (unsigned char *)nm.data();
-            out_len = 0;
-            ACE_Byte* encName = ACE_Base64::encode(out, nm.length(), &out_len);
-            std::string b64_((char *)encName, out_len);
-            std::stringstream ss("");
-            ss << b64_ << "\r\n";
-            base64Username = ss.str();
-            return(1);
+        if(plain) {
+            std::string usrName((char *)plain, out_len);
+            if(!usrName.compare("Password:")) {
+                std::string nm("Pin@232326");
+                const ACE_Byte* out = (unsigned char *)nm.data();
+                out_len = 0;
+                ACE_Byte* encName = ACE_Base64::encode(out, nm.length(), &out_len);
+                std::string b64_((char *)encName, out_len);
+                std::stringstream ss("");
+                ss << b64_ << "\r\n";
+                base64Username = ss.str();
+                return(0);
+            }
         }
     }
-    return(0);
+    return(1);
 }
 
 void SMTP::QUIT::onEntry()
