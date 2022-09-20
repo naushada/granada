@@ -56,12 +56,15 @@ ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
 
     /// @brief feed to FSm for processing of incoming request
     auto nxtAction = user().fsm().onRx(ss, out, new_state);
+    
     /// @brief  send the response for received request.
-    ret = m_secureDataStream.send_n(out.c_str(), out.length());
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent length:%d command:%s\n"), ret, out.c_str()));
+    if(out.length()) {
+        ret = m_secureDataStream.send_n(out.c_str(), out.length());
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent length:%d command:%s\n"), ret, out.c_str()));
+    }
 
+    /// @brief  move to new state for processing of next Request.
     if(nxtAction) {
-        /// @brief  move to new state for processing of next Request.
         user().fsm().set_state(new_state);
     }
     
