@@ -163,6 +163,7 @@ namespace SMTP {
       std::uint32_t onRequest(std::string in, std::string& out, States& new_state);
       std::uint32_t onUsername(const std::string in, std::string& base64Username);
       std::uint32_t onPassword(const std::string in, std::string& base64Password);
+      bool onLoginSuccess(const std::string in, std::string& base64Username);
   };
 
   class RCPT {

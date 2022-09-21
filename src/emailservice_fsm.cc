@@ -18,25 +18,11 @@
 
 std::uint32_t parseSmtpCommand(const std::string in, std::vector<std::string>& out)
 {
-    #if 0
-    std::regex word("\\w+");
-    auto words_begin = 
-    std::sregex_iterator(in.begin(), in.end(), word);
-    auto words_end = std::sregex_iterator();
-
-    out.clear();
-    for(std::sregex_iterator i = words_begin; i != words_end; ++i) {
-        std::smatch match = *i;
-        std::string match_str = match.str();
-        std::cout << "  " << match_str << '\n';
-        out.push_back(match_str);
-    }
-    #endif
     std::stringstream input(in);
     std::int32_t c;
     std::string elm("");
     out.clear();
-    
+   
     std::cout << "Request:" << in << std::endl;
 
     while((c = input.get()) != EOF) {
@@ -73,15 +59,12 @@ std::uint32_t getBase64(const std::string in, std::string& b64Out)
     size_t out_len = 0;
     const ACE_Byte* data = (ACE_Byte *)in.data();
     
-    //std::string nm("naushad.dln@gmail.com");
-    //const ACE_Byte* out = (unsigned char *)nm.data();
-    
     ACE_Byte* encName = ACE_Base64::encode(data, in.length(), &out_len);
     std::string b64_((char *)encName, out_len);
     std::stringstream ss("");
-    ss << b64_ << "\r\n";
+    ss << b64_;
     b64Out = ss.str();
-
+    free(encName);
     return(0);
 }
 
@@ -225,18 +208,18 @@ std::uint32_t SMTP::RCPT::onRequest(std::string in, std::string& out, States& ne
 
 void SMTP::MAIL::onEntry()
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL function:%s\n"), __PRETTY_FUNCTION__));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL function:%s\n"), __PRETTY_FUNCTION__));
     m_authStage = AUTH_INIT;
 }
 
 void SMTP::MAIL::onExit()
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL function:%s\n"), __PRETTY_FUNCTION__));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL function:%s\n"), __PRETTY_FUNCTION__));
 }
 
 std::int32_t SMTP::MAIL::onResponse(std::string in)
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL receive length:%d response:%s\n"), in.length(), in.c_str()));
     
     return(0);
 }
@@ -249,10 +232,11 @@ std::int32_t SMTP::MAIL::onResponse()
 std::uint32_t SMTP::MAIL::onRequest(std::string in, std::string& out, States& new_state)
 {
     std::stringstream ss("");
-    
+
     if(AUTH_INIT == m_authStage) {
         ss << "MAIL FROM:<naushad.dln@gmail.com>" << "\r\n"
            << "AUTH LOGIN" << "\r\n";
+        
         /// @brief modifiying out with response message to be sent to smtp server 
         out = ss.str();
         m_authStage = AUTH_USRNAME;
@@ -267,6 +251,15 @@ std::uint32_t SMTP::MAIL::onRequest(std::string in, std::string& out, States& ne
     } else if(AUTH_PASSWORD == m_authStage) {
         if(!onPassword(in, out)) { 
             m_authStage = AUTH_SUCCESS;
+        }
+        return(0);
+    } else if(AUTH_SUCCESS == m_authStage) {
+        if(!onLoginSuccess(in, out)) {
+          ss << "RESET" << "\r\n";
+          out = ss.str();
+          m_authStage = AUTH_INIT;
+          new_state = RESET{};
+          return(1);
         }
     }
 
@@ -283,19 +276,17 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
     auto statusCode = std::stoi(commandList.at(0));
     for(auto& ss: commandList) {
         std::cout << ss << std::endl;
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL element:%s\n"), ss.c_str()));
     }
 
     if(334 == statusCode) {
-        std::cout << "0.StatusCode" << statusCode << std::endl;
         const ACE_Byte* data = (ACE_Byte *)(commandList.at(1)).data();
         ACE_Byte* plain = ACE_Base64::decode(data, &out_len);
 
         if(plain) {
             std::string usrName((char *)plain, out_len);
-            std::cout << "1.Username:" << usrName << std::endl;
 
             if(!usrName.compare("Username:")) {
-                std::cout << "2.Username:" << usrName << std::endl;
                 std::string nm("naushad.dln@gmail.com");
                 const ACE_Byte* out = (unsigned char *)nm.data();
                 out_len = 0;
@@ -304,6 +295,7 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
                 std::stringstream ss("");
                 ss << b64_ << "\r\n";
                 base64Username = ss.str();
+                free(plain);
                 return(0);
             }
         }
@@ -334,13 +326,29 @@ std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Us
                 std::stringstream ss("");
                 ss << b64_ << "\r\n";
                 base64Username = ss.str();
+                free(plain);
                 return(0);
             }
         }
     }
     return(1);
 }
-
+bool SMTP::MAIL::onLoginSuccess(const std::string in, std::string& out)
+{
+    std::vector<std::string> commandList;
+    auto ret = parseSmtpCommand(in, commandList);
+    auto statusCode = (commandList.size() > 0) ? std::stoi(commandList.at(0)) : 0;
+   
+    if(235 /*Authentication Successfull*/ == statusCode) {
+        /*
+        std::stringstream ss("");
+        ss << "MAIL FROM: <naushad.dln@gmail.com>" << "\r\n";
+        out = ss.str();
+        */
+        return(true);
+    }
+    return(false);
+}
 void SMTP::QUIT::onEntry()
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST:QUIT function:%s\n"), __PRETTY_FUNCTION__));
