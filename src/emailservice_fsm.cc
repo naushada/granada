@@ -166,7 +166,7 @@ std::uint32_t SMTP::BODY::onRequest(std::string in, std::string& out, States& ne
     ss << "This is fromemail service " << "\r\n"
        << "This is line1 " << "\r\n"
        << "This is line2 " << "\r\n"
-       << "." <<"\r\n";
+       << "\r\n" << "." <<"\r\n";
 
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
