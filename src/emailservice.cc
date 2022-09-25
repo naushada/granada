@@ -194,8 +194,8 @@ std::int32_t SMTP::User::startEmailTransaction()
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l acquiring semaphore\n")));
   m_client->m_semaphore->acquire();
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l semaphore is released\n")));
-  //m_client->tx(req);
-  //m_fsm.set_state(MAIL());
+  /* upon connection establishment to smtp server, smtp server replies with greeting */
+  m_fsm.set_state(GREETING());
   
   return(ret);
 }
@@ -216,7 +216,7 @@ std::int32_t SMTP::User::rx(std::string out)
 {
   //auto stateType = decltype(m_fsm)
   //auto idx = m_fsm.index();
-  m_fsm.onResponse(out);
+  //m_fsm.onCommand(out);
   //return(get_state().onResponse(out));
 }
 
