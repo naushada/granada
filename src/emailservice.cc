@@ -64,7 +64,7 @@ ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
     }
 
     /// @brief  move to new state for processing of next Request.
-    if(nxtAction) {
+    if(!nxtAction) {
         user().fsm().set_state(new_state);
     }
     

@@ -30,7 +30,7 @@
 
 
 namespace SMTP {
-  enum statusCode_t: std::uint32_t {
+  enum statusCode: std::uint32_t {
     STATUS_CODE_214_Response_to_HELP = 214,
     STATUS_CODE_211_System_status = 211,
     STATUS_CODE_220_Service_ready = 220,
@@ -77,11 +77,11 @@ namespace SMTP {
     STATUS_CODE_556_Domain_does_not_accept_mail = 556
 
   };
-  
+
   //std::unordered_map<statusCode_t, std::string>statusCodeUMap;
   /// @brief Forward declaration of classes
   class User;
-  class INIT;
+  class HELO;
   class MAIL;
   class RCPT;
   class DATA;
@@ -95,7 +95,7 @@ namespace SMTP {
   class GREETING;
 
   /// @brief For new state, add into this variant 
-  using States = std::variant<GREETING, INIT, MAIL, RCPT, DATA, QUIT, BODY, HELP, NOOP, VRFY, EXPN, RESET>;
+  using States = std::variant<GREETING, HELO, MAIL, RCPT, DATA, QUIT, BODY, HELP, NOOP, VRFY, EXPN, RESET>;
   
   /// @brief the Client instance will be active object
   class Client : public ACE_Task<ACE_MT_SYNCH> {
@@ -269,10 +269,10 @@ namespace SMTP {
       std::uint32_t onResponse(std::string in, std::string& out, States& new_state);
       std::uint32_t onCommand(std::string in, std::string& out, States& new_state);
   };
-  class INIT {
+  class HELO {
     public:
-      INIT() = default;
-      ~INIT() = default;
+      HELO() = default;
+      ~HELO() = default;
 
       void onEntry();
       void onExit();
