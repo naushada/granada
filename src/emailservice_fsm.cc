@@ -140,6 +140,7 @@ std::uint32_t SMTP::GREETING::onCommand(std::string in, std::string& out, States
     out = ss.str();
     /// @brief moving to new state for processing of new command or request 
     new_state = HELO{};
+    //new_state = MAIL{};
     return(0);
 }
 
@@ -192,7 +193,7 @@ std::uint32_t SMTP::HELO::onResponse(std::string in, std::string& out, States& n
 std::uint32_t SMTP::HELO::onCommand(std::string in, std::string& out, States& new_state)
 {
     std::stringstream ss("");
-    ss << "MAIL FROM:<hnm.royal@gmail.com>" << "\r\n";
+    ss << "MAIL FROM: HM Royal<hnm.royal@gmail.com>" << "\r\n";
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
     /// @brief moving to new state for processing of new command or request 
@@ -231,12 +232,14 @@ std::uint32_t SMTP::MAIL::onResponse(std::string in, std::string& out, States& n
     switch(statusCode) {
         case SMTP::STATUS_CODE_530_5_7_0_Authentication_needed:
         case SMTP::STATUS_CODE_334_Server_challenge:
+        case SMTP::STATUS_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
         case STATUS_CODE_535_5_7_8_Authentication_credentials_invalid:
-        break;
         
+        break;
+
         default:
             display(in);
         break;
@@ -250,8 +253,8 @@ std::uint32_t SMTP::MAIL::onCommand(std::string in, std::string& out, States& ne
     std::stringstream ss("");
 
     if(AUTH_INIT == m_authStage) {
+        std::string result("");
         ss << "AUTH LOGIN" << "\r\n";
-        
         /// @brief modifiying out with response message to be sent to smtp server 
         out = ss.str();
         m_authStage = AUTH_USRNAME;
@@ -295,7 +298,7 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
         std::string usrName((char *)plain, out_len);
 
         if(!usrName.compare("Username:")) {
-            std::string nm("hnm.royal@gmail.com");
+            std::string nm("naushad.dln@gmail.com");
             const ACE_Byte* out = (unsigned char *)nm.data();
             out_len = 0;
             ACE_Byte* encName = ACE_Base64::encode(out, nm.length(), &out_len);
@@ -323,7 +326,7 @@ std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Us
         if(plain) {
             std::string pwd((char *)plain, out_len);
             if(!pwd.compare("Password:")) {
-                std::string nm("bxgoglwmtbeukllb");
+                std::string nm("jsoekmchdqquwyln");
                 const ACE_Byte* out = (unsigned char *)nm.data();
                 out_len = 0;
                 ACE_Byte* encName = ACE_Base64::encode(out, nm.length(), &out_len);
@@ -385,7 +388,7 @@ std::uint32_t SMTP::DATA::onCommand(std::string in, std::string& out, States& ne
 {
 
     std::stringstream ss("");
-    ss << "DATA" << "\r\n";
+    ss << "DATA " << "\r\n";
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
  
