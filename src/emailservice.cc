@@ -3,6 +3,87 @@
 
 #include "emailservice.hpp"
 
+SMTP::Tls::Tls()
+{
+
+}
+
+SMTP::Tls::~Tls()
+{
+
+}
+
+void SMTP::Tls::init()
+{
+    const SSL_METHOD *method;
+    /* Load cryptos, et.al. */
+    OpenSSL_add_all_algorithms();	
+    /* Bring in and register error messages */	
+    SSL_load_error_strings();			
+    /* Create new client-method instance */
+    method = SSLv23_client_method();		
+    /* Create new context */
+    m_sslCtx = SSL_CTX_new(method);			
+    if(m_sslCtx == NULL) {
+        fprintf(stderr, "Context for SSL creation Failed\n");	
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ssl context creation is failed aborting it.\n")));
+        ERR_print_errors_fp(stderr);
+        abort();
+    }
+
+    /* ---------------------------------------------------------- *
+     * Disabling SSLv2 will leave v3 and TSLv1 for negotiation    *
+     * ---------------------------------------------------------- */
+    SSL_CTX_set_options(m_sslCtx, SSL_OP_NO_SSLv2);
+}
+
+std::int32_t SMTP::Tls::start(std::int32_t tcp_handle)
+{
+    std::int32_t rc = -1;
+
+    init();
+    /*create new SSL connection state*/
+    m_ssl = SSL_new(m_sslCtx);
+    /*continue as long as m_ssl is not NULL*/
+    assert(m_ssl != NULL);
+
+    /*attach the tcp socket descriptor to SSL*/
+    rc = SSL_set_fd(m_ssl, tcp_handle);
+    assert(rc == 1);
+  	
+    /*Initiate ClientHello Message to TLS Server*/
+    if((rc = SSL_connect(m_ssl)) != 1) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l SSL_connect is failed %d\n"), SSL_get_error(m_ssl, rc)));
+        /*TLS/SSL handshake is not successfullu*/
+        SSL_free(m_ssl);
+        SSL_CTX_free(m_sslCtx);
+    }
+    return(rc);
+}
+
+std::int32_t SMTP::Tls::read()
+{
+    int rc = -1;
+
+    assert(plain_buffer != NULL);
+
+    rc = SSL_read(m_ssl, plain_buffer, /*Max plain buffer size*/ plain_buffer_len);
+    return(rc);
+}
+
+std::int32_t SMTP::Tls::write()
+{
+    int rc = -1;
+    assert(plain_buffer != NULL);
+    rc = SSL_write(m_ssl, plain_buffer, /*Max plain buffer size*/plain_buffer_len);
+    return(rc);
+}
+
+void SMTP::Tls::close()
+{
+
+}
+
 SMTP::Client::Client(ACE_UINT16 port, std::string addr, User* user)
 {
   m_user = user;

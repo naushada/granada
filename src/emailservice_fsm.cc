@@ -193,7 +193,8 @@ std::uint32_t SMTP::HELO::onResponse(std::string in, std::string& out, States& n
 std::uint32_t SMTP::HELO::onCommand(std::string in, std::string& out, States& new_state)
 {
     std::stringstream ss("");
-    ss << "MAIL FROM: HM Royal<hnm.royal@gmail.com>" << "\r\n";
+    //ss << "MAIL FROM: HM Royal<hnm.royal@gmail.com>" << "\r\n";
+    ss << "STARTTLS" << "\r\n";
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
     /// @brief moving to new state for processing of new command or request 
@@ -298,7 +299,7 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
         std::string usrName((char *)plain, out_len);
 
         if(!usrName.compare("Username:")) {
-            std::string nm("naushad.dln@gmail.com");
+            std::string nm("hnm.royal@gmail.com");
             const ACE_Byte* out = (unsigned char *)nm.data();
             out_len = 0;
             ACE_Byte* encName = ACE_Base64::encode(out, nm.length(), &out_len);
@@ -326,7 +327,7 @@ std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Us
         if(plain) {
             std::string pwd((char *)plain, out_len);
             if(!pwd.compare("Password:")) {
-                std::string nm("jsoekmchdqquwyln");
+                std::string nm("bxgoglwmtbeukllb");
                 const ACE_Byte* out = (unsigned char *)nm.data();
                 out_len = 0;
                 ACE_Byte* encName = ACE_Base64::encode(out, nm.length(), &out_len);

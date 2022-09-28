@@ -7,7 +7,16 @@
 #include <variant>
 #include <type_traits>
 #include <optional>
-
+#include <cassert>
+/*
+#include <openssl/bio.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/ossl_typ.h>
+#include <openssl/pem.h>
+#include <openssl/x509.h>
+#include <openssl/x509_vfy.h>
+*/
 #include "ace/Reactor.h"
 #include "ace/Basic_Types.h"
 #include "ace/Event_Handler.h"
@@ -97,6 +106,20 @@ namespace SMTP {
   /// @brief For new state, add into this variant 
   using States = std::variant<GREETING, HELO, MAIL, RCPT, DATA, QUIT, BODY, HELP, NOOP, VRFY, EXPN, RESET>;
   
+  class Tls {
+      public:
+          Tls();
+          ~Tls();
+          void init();
+          std::int32_t start(std::int32_t handle);
+          std::int32_t read();
+          std::int32_t write();
+          void close();
+      private:
+          SSL *m_ssl;
+          SSL_CTX *m_sslCtx;
+  };
+
   /// @brief the Client instance will be active object
   class Client : public ACE_Task<ACE_MT_SYNCH> {
 
@@ -125,16 +148,18 @@ namespace SMTP {
 
     public:
       ACE_INET_Addr m_smtpServerAddress;
-      ACE_SSL_SOCK_Connector m_secureSmtpServerConnection;
-      ACE_SSL_SOCK_Stream m_secureDataStream;
-      //ACE_SOCK_Connector m_secureSmtpServerConnection;
-      //ACE_SOCK_Stream m_secureDataStream;
+      //ACE_SSL_SOCK_Connector m_secureSmtpServerConnection;
+      //ACE_SSL_SOCK_Stream m_secureDataStream;
+      ACE_SOCK_Connector m_secureSmtpServerConnection;
+      ACE_SOCK_Stream m_secureDataStream;
       ACE_Message_Block *m_mb;
       bool m_mailServiceAvailable;
       User *m_user;
       ACE_Sig_Set ss;
       std::unique_ptr<ACE_Semaphore> m_semaphore;
+      std::unique_ptr<Tls> m_tls;;
   };
+
   /*  _ ___
    * ||   ||
    * ||_ _//
@@ -413,7 +438,7 @@ namespace SMTP {
       User() {
         /// For secure smtp the port is 465 and plain smtp the port is 25.
         //m_client = std::make_unique<Client>(/*"smtp.gmail.com:465"*/"142.251.12.108:465", this);
-        m_client = std::make_unique<Client>(465, "smtp.gmail.com", this);
+        m_client = std::make_unique<Client>(25, "smtp.gmail.com", this);
 
         account().email("naushad.dln@gmail.com").name("Naushad Ahmed")
                  .password("abcd").userid("naushad.dln");
