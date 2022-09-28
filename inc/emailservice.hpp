@@ -112,8 +112,9 @@ namespace SMTP {
           ~Tls();
           void init();
           std::int32_t start(std::int32_t handle);
-          std::int32_t read();
-          std::int32_t write();
+          std::int32_t read(std::array<char, 512> plain_buffer);
+          std::int32_t write(std::array<char, 512> plain_buffer, size_t len);
+          std::int32_t peek(std::array<char, 512> plain_buffer, size_t len);
           void close();
       private:
           SSL *m_ssl;

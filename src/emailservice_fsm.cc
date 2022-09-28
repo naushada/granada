@@ -240,7 +240,9 @@ std::uint32_t SMTP::MAIL::onResponse(std::string in, std::string& out, States& n
         case STATUS_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-
+        case STATUS_CODE_220_Service_ready:
+            
+        break;
         default:
             display(in);
         break;

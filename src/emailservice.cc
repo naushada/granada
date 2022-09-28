@@ -5,12 +5,14 @@
 
 SMTP::Tls::Tls()
 {
-
+    m_ssl = nullptr;
+    m_sslCtx = nullptr;
 }
 
 SMTP::Tls::~Tls()
 {
-
+    SSL_free(m_ssl);
+    SSL_CTX_free(m_sslCtx);
 }
 
 void SMTP::Tls::init()
@@ -25,7 +27,6 @@ void SMTP::Tls::init()
     /* Create new context */
     m_sslCtx = SSL_CTX_new(method);			
     if(m_sslCtx == NULL) {
-        fprintf(stderr, "Context for SSL creation Failed\n");	
         ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ssl context creation is failed aborting it.\n")));
         ERR_print_errors_fp(stderr);
         abort();
@@ -61,21 +62,26 @@ std::int32_t SMTP::Tls::start(std::int32_t tcp_handle)
     return(rc);
 }
 
-std::int32_t SMTP::Tls::read()
+std::int32_t SMTP::Tls::read(std::array<char, 512> plain_buffer)
 {
-    int rc = -1;
-
-    assert(plain_buffer != NULL);
-
-    rc = SSL_read(m_ssl, plain_buffer, /*Max plain buffer size*/ plain_buffer_len);
+    std::int32_t rc = -1;
+    plain_buffer.fill(0);
+    
+    rc = SSL_read(m_ssl, plain_buffer.data(), plain_buffer.size());
     return(rc);
 }
 
-std::int32_t SMTP::Tls::write()
+std::int32_t SMTP::Tls::write(std::array<char, 512> plain_buffer, size_t len)
 {
-    int rc = -1;
-    assert(plain_buffer != NULL);
-    rc = SSL_write(m_ssl, plain_buffer, /*Max plain buffer size*/plain_buffer_len);
+    std::int32_t rc = -1;
+    rc = SSL_write(m_ssl, plain_buffer.data(), len);
+    return(rc);
+}
+
+std::int32_t SMTP::Tls::peek(std::array<char, 512> plain_buffer, size_t len)
+{
+    std::int32_t rc = -1;
+    rc = SSL_peek(m_ssl, plain_buffer.data(), len);
     return(rc);
 }
 
@@ -91,11 +97,13 @@ SMTP::Client::Client(ACE_UINT16 port, std::string addr, User* user)
   m_mailServiceAvailable = false;
   m_smtpServerAddress.set(port, addr.c_str());
   m_semaphore = std::make_unique<ACE_Semaphore>();
+  m_tls = std::make_unique<Tls>();
 }
 
 SMTP::Client::~Client()
 {
   m_semaphore.reset(nullptr);
+  m_tls.reset(nullptr);
 }
 
 int SMTP::Client::svc(void) {
