@@ -3,16 +3,18 @@
 
 #include "emailservice.hpp"
 
-SMTP::Tls::Tls()
+SMTP::Tls::Tls(User* parent)
 {
     m_ssl = nullptr;
     m_sslCtx = nullptr;
+    m_user = parent;
 }
 
 SMTP::Tls::~Tls()
 {
     SSL_free(m_ssl);
     SSL_CTX_free(m_sslCtx);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [tlsservice:%t] %M %N:%l TLS service is freed\n")));
 }
 
 void SMTP::Tls::init()
@@ -27,7 +29,7 @@ void SMTP::Tls::init()
     /* Create new context */
     m_sslCtx = SSL_CTX_new(method);			
     if(m_sslCtx == NULL) {
-        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ssl context creation is failed aborting it.\n")));
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [tlsservice:%t] %M %N:%l ssl context creation is failed aborting it.\n")));
         ERR_print_errors_fp(stderr);
         abort();
     }
@@ -54,34 +56,53 @@ std::int32_t SMTP::Tls::start(std::int32_t tcp_handle)
   	
     /*Initiate ClientHello Message to TLS Server*/
     if((rc = SSL_connect(m_ssl)) != 1) {
-        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l SSL_connect is failed %d\n"), SSL_get_error(m_ssl, rc)));
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [tlsservice:%t] %M %N:%l SSL_connect_error:%d\n"), SSL_get_error(m_ssl, rc)));
         /*TLS/SSL handshake is not successfullu*/
         SSL_free(m_ssl);
         SSL_CTX_free(m_sslCtx);
+        isTlsUP(false);
+    }
+
+    isTlsUP(true);
+    return(rc);
+}
+
+std::int32_t SMTP::Tls::read(std::string& plain_buffer)
+{
+    std::int32_t rc = -1;
+    std::array<char, 2048> rd;
+    rd.fill(0);
+    rc = SSL_read(m_ssl, rd.data(), rd.max_size());
+    if(rc <= 0) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [tlsservice:%t] %M %N:%l SSL_read is failed %d\n"), SSL_get_error(m_ssl, rc)));
+    } else {
+      plain_buffer = std::string(rd.data(), rc);
     }
     return(rc);
 }
 
-std::int32_t SMTP::Tls::read(std::array<char, 512> plain_buffer)
+std::int32_t SMTP::Tls::write(std::string plain_buffer)
 {
     std::int32_t rc = -1;
-    plain_buffer.fill(0);
+    std::int32_t offset = 0;
+    std::int32_t len = plain_buffer.length();
     
-    rc = SSL_read(m_ssl, plain_buffer.data(), plain_buffer.size());
+    do {
+        rc = SSL_write(m_ssl, (plain_buffer.data() + offset), (len - offset));
+        if(rc <= 0) {
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [tlsservice:%t] %M %N:%l SSL_write is rc%d err:%d\n"), rc, SSL_get_error(m_ssl, rc)));
+        } else {
+            offset += rc;
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [tlsservice:%t] %M %N:%l SSL_write is length:%d\n"), rc));
+        }
+    }while(offset != len);
     return(rc);
 }
 
-std::int32_t SMTP::Tls::write(std::array<char, 512> plain_buffer, size_t len)
+std::int32_t SMTP::Tls::peek(std::string& plain_buffer)
 {
     std::int32_t rc = -1;
-    rc = SSL_write(m_ssl, plain_buffer.data(), len);
-    return(rc);
-}
-
-std::int32_t SMTP::Tls::peek(std::array<char, 512> plain_buffer, size_t len)
-{
-    std::int32_t rc = -1;
-    rc = SSL_peek(m_ssl, plain_buffer.data(), len);
+    rc = SSL_peek(m_ssl, plain_buffer.data(), 512);
     return(rc);
 }
 
@@ -97,13 +118,12 @@ SMTP::Client::Client(ACE_UINT16 port, std::string addr, User* user)
   m_mailServiceAvailable = false;
   m_smtpServerAddress.set(port, addr.c_str());
   m_semaphore = std::make_unique<ACE_Semaphore>();
-  m_tls = std::make_unique<Tls>();
 }
 
 SMTP::Client::~Client()
 {
   m_semaphore.reset(nullptr);
-  m_tls.reset(nullptr);
+  
 }
 
 int SMTP::Client::svc(void) {
@@ -131,37 +151,24 @@ ACE_INT32 SMTP::Client::handle_timeout(const ACE_Time_Value &tv, const void *act
 
 ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
 {
-  std::array<std::uint8_t, 2048> in;
-  in.fill(0);
+  size_t ret = -1;
+  
+  if(!user().tls()->isTlsUP()) {
+      std::array<std::uint8_t, 2048> in;
+      in.fill(0);
+      ret = m_stream.recv((void *)in.data(), in.max_size());
+      std::string ss((char *)in.data(), ret);
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l received over plain tcp length:%d response:%s\n"), ret, ss.c_str()));
+      user().rx(ss);
 
-  auto ret = m_secureDataStream.recv((void *)in.data(), in.max_size());
-  if(ret > 0) {
-
-    std::string ss((char *)in.data(), ret);
-    std::string out("");
-    SMTP::States new_state;
-
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l receive length:%d response:%s\n"), ret, ss.c_str()));
-
-    /// @brief feed to FSm for processing of incoming request
-    auto nxtAction = user().fsm().onRx(ss, out, new_state);
-    
-    /// @brief  send the response for received request.
-    if(out.length()) {
-        ret = m_secureDataStream.send_n(out.c_str(), out.length());
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent length:%d command:%s\n"), ret, out.c_str()));
-    }
-
-    /// @brief  move to new state for processing of next Request.
-    if(!nxtAction) {
-        user().fsm().set_state(new_state);
-    }
-    
   } else {
-    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l handle_input failed\n")));
-    return(-1);
+    std::string ss;
+    ss.clear();
+    ret = user().tls()->read(ss);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l received over tls length:%d response:%s\n"), ret, ss.c_str()));
+    user().rx(ss);
   }
-
+  
   /// @return upon success returns zero meaning middleware will continue the reactor loop else it breaks the loop
   return(0);
 }
@@ -169,11 +176,12 @@ ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
 ACE_INT32 SMTP::Client::handle_signal(int signum, siginfo_t *s, ucontext_t *u)
 {
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l Signal Number %d and its name %S is received for emailservice\n"), signum, signum));
-  ACE_Reactor::instance()->remove_handler(m_secureDataStream.get_handle(), 
+  ACE_Reactor::instance()->remove_handler(m_stream.get_handle(), 
                                                          ACE_Event_Handler::ACCEPT_MASK | 
                                                          ACE_Event_Handler::TIMER_MASK | 
-                                                         ACE_Event_Handler::SIGNAL_MASK);
-  return(-1);
+                                                         ACE_Event_Handler::SIGNAL_MASK |
+                                                         ACE_Event_Handler::READ_MASK);
+  return(0);
 
 }
 
@@ -183,14 +191,14 @@ std::int32_t SMTP::Client::tx(const std::string in)
 
   if(m_mailServiceAvailable) {
 
-    txLen = m_secureDataStream.send_n(in.c_str(), in.length());
+    txLen = m_stream.send_n(in.c_str(), in.length());
 
     if(txLen < 0) {
       ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l send_n to %s and port %u is failed for length %u\n"), 
         m_smtpServerAddress.get_host_name(), m_smtpServerAddress.get_port_number(), in.length()));
     }
 
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l successfully sent of length %d on handle %u\n"), in.length(), m_secureDataStream.get_handle()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l successfully sent of length %d on handle %u\n"), in.length(), m_stream.get_handle()));
   }
   return(txLen);
 }
@@ -216,8 +224,8 @@ ACE_INT32 SMTP::Client::handle_close(ACE_HANDLE fd, ACE_Reactor_Mask mask)
  */
 ACE_HANDLE SMTP::Client::get_handle() const
 {
-  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l get_handle handle:%u\n"), m_secureDataStream.get_handle()));
-  return(m_secureDataStream.get_handle());
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l fn:%s handle:%u\n"), __PRETTY_FUNCTION__, m_stream.get_handle()));
+  return(m_stream.get_handle());
 }
 
 /**
@@ -226,8 +234,9 @@ ACE_HANDLE SMTP::Client::get_handle() const
  */
 void SMTP::Client::start()
 {
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l entry_fn:%s \n"), __PRETTY_FUNCTION__));
   do {
-    if(m_secureSmtpServerConnection.connect(m_secureDataStream, m_smtpServerAddress)) {
+    if(m_connection.connect(m_stream, m_smtpServerAddress)) {
       ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l connect to host-name:%s and port-number:%u is failed\n"), 
            m_smtpServerAddress.get_host_name(), m_smtpServerAddress.get_port_number()));
       m_mailServiceAvailable = false;
@@ -238,11 +247,11 @@ void SMTP::Client::start()
            m_smtpServerAddress.get_host_name(),m_smtpServerAddress.get_host_addr(), m_smtpServerAddress.get_port_number()));
 
     /* Feed this new handle to event Handler for read/write operation. */
-    ACE_Reactor::instance()->register_handler(m_secureDataStream.get_handle(), this, ACE_Event_Handler::READ_MASK |
-                                                                                     ACE_Event_Handler::TIMER_MASK |
-                                                                                     ACE_Event_Handler::SIGNAL_MASK);
+    ACE_Reactor::instance()->register_handler(m_stream.get_handle(), this, ACE_Event_Handler::READ_MASK |
+                                                                           ACE_Event_Handler::TIMER_MASK |
+                                                                           ACE_Event_Handler::SIGNAL_MASK);
 
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l The emailservice is connected at handle:%u\n"), m_secureDataStream.get_handle()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l The emailservice is connected at handle:%u\n"), m_stream.get_handle()));
     m_mailServiceAvailable = true;
 
     /* subscribe for signal */
@@ -257,34 +266,41 @@ void SMTP::Client::start()
 
 }
 
-void SMTP::Client::main() {
+void SMTP::Client::main() 
+{
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l entry_fn:%s \n"), __PRETTY_FUNCTION__));
     ACE_Time_Value to(1,0);
-    while(m_mailServiceAvailable) ACE_Reactor::instance()->handle_events();
+    while(m_mailServiceAvailable) ACE_Reactor::instance()->handle_events(to);
 }
 
 void SMTP::Client::stop()
 {
-  ACE_Reactor::instance()->remove_handler(m_secureDataStream.get_handle(), ACE_Event_Handler::ACCEPT_MASK |
-                                                                           ACE_Event_Handler::TIMER_MASK |
-                                                                           ACE_Event_Handler::SIGNAL_MASK);
-
+    ACE_Reactor::instance()->remove_handler(m_stream.get_handle(), ACE_Event_Handler::ACCEPT_MASK |
+                                                                   ACE_Event_Handler::TIMER_MASK |
+                                                                   ACE_Event_Handler::SIGNAL_MASK |
+                                                                   ACE_Event_Handler::READ_MASK);
+    m_mailServiceAvailable = false;
 }
 
 SMTP::User::~User()
 {
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l entry_fn:%s \n"), __PRETTY_FUNCTION__));
   m_client.reset(nullptr);
+  m_tls.reset(nullptr);
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l dtor of User\n")));
 }
 
 std::int32_t SMTP::User::startEmailTransaction()
 {
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l entry_fn:%s \n"), __PRETTY_FUNCTION__));
   std::int32_t ret = 0;
   std::string req;
-  m_client->start();
+  client()->start();
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l acquiring semaphore\n")));
-  m_client->m_semaphore->acquire();
+  client()->m_semaphore->acquire();
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l semaphore is released\n")));
   /* upon connection establishment to smtp server, smtp server replies with greeting */
-  m_fsm.set_state(GREETING());
+  fsm().set_state(GREETING());
   
   return(ret);
 }
@@ -301,12 +317,73 @@ std::int32_t SMTP::User::endEmailTransaction()
  * @param out response string from SMTP server
  * @return std::int32_t returns > 0 upon success else less than 0
  */
-std::int32_t SMTP::User::rx(std::string out)
+std::int32_t SMTP::User::rx(const std::string in)
 {
-  //auto stateType = decltype(m_fsm)
-  //auto idx = m_fsm.index();
-  //m_fsm.onCommand(out);
-  //return(get_state().onResponse(out));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l entry_fn:%s \n"), __PRETTY_FUNCTION__));
+    std::string cmd("");
+    SMTP::States new_state;
+  
+    auto status = SMTP::getSmtpStatusCode(in);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l m_status:%u \n"), status.m_reply));
+    switch(status.m_reply) {
+
+        case SMTP::STATUS_CODE_220_Service_ready:
+        {
+            if(!status.m_statusCode.compare("2.0.0")) {
+                /* Reply to STARTTLS command - switch to TLS now */
+                m_tls->start(client()->get_handle());
+                auto result = fsm().onRx(in, cmd, new_state);
+                /// @brief  send the response for received request.
+                if(cmd.length()) {
+                    //ret = m_secureDataStream.send_n(out.c_str(), out.length());
+                    auto len = m_tls->write(cmd);
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent over tls length:%d command:%s\n"), len, cmd.c_str()));
+                }
+                /// @brief  move to new state for processing of next Request.
+                if(!result) {
+                    fsm().set_state(new_state);
+                }
+            } else {
+                /* This is a grreting from SMTP server upon TCP connection establishment */
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l greeting from smtp server length:%d command:%s\n"), 
+                         in.length(), in.c_str()));
+                auto result = fsm().onRx(in, cmd, new_state);
+                /// @brief  send the response for received request.
+                if(cmd.length()) {
+                    //ret = m_secureDataStream.send_n(out.c_str(), out.length());
+                    auto len = client()->tx(cmd);
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent over plain tcp length:%d command:%s\n"), len, cmd.c_str()));
+                }
+                /// @brief  move to new state for processing of next Request.
+                if(!result) {
+                    fsm().set_state(new_state);
+                }
+            }
+        }
+        break;
+
+        default:
+        {
+            auto result = fsm().onRx(in, cmd, new_state);
+            /// @brief  send the response for received request.
+            if(cmd.length()) {
+                //ret = m_secureDataStream.send_n(out.c_str(), out.length());
+                size_t len = -1;
+                if(tls()->isTlsUP()) {
+                    len = m_tls->write(cmd);
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent over tls length:%d command:%s\n"), len, cmd.c_str()));
+                } else {
+                    client()->tx(cmd);
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sen tover plain tcp length:%d command:%s\n"), len, cmd.c_str()));
+                }
+            }
+            /// @brief  move to new state for processing of next Request.
+            if(!result) {
+                fsm().set_state(new_state);
+            }
+        }
+        break;
+    }
 }
 
 /**

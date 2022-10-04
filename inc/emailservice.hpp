@@ -39,6 +39,36 @@
 
 
 namespace SMTP {
+    struct Response {
+        std::uint32_t m_reply;
+        std::string m_statusCode;
+        bool operator==(const Response& rp) const {
+        //return(m_reply == rp.m_reply && m_statusCode == rp.m_statusCode);
+        return(m_reply == rp.m_reply);
+    }
+    Response() = default;
+    ~Response() = default;
+    
+    Response(std::uint32_t reply, std::string code) {
+        m_reply = reply;
+        m_statusCode = code;
+    }
+  };
+
+  struct hFn {
+    auto operator()(const Response& r1) const {
+        std::size_t h1 = std::hash<std::uint32_t>()(r1.m_reply);
+        std::size_t h2 = std::hash<std::string>()(r1.m_statusCode);
+ 
+        return (h1 ^ h2);
+    }
+  };
+
+  std::uint32_t parseSmtpCommand(const std::string in, std::unordered_map<Response, std::string, hFn>& out);
+  SMTP::Response getSmtpStatusCode(const std::string in);
+  std::uint32_t getBase64(const std::string in, std::string& b64Out);
+  void display(std::string in);
+
   enum statusCode: std::uint32_t {
     STATUS_CODE_214_Response_to_HELP = 214,
     STATUS_CODE_211_System_status = 211,
@@ -108,17 +138,31 @@ namespace SMTP {
   
   class Tls {
       public:
-          Tls();
+
+          Tls(User *usr);
           ~Tls();
+
           void init();
           std::int32_t start(std::int32_t handle);
-          std::int32_t read(std::array<char, 512> plain_buffer);
-          std::int32_t write(std::array<char, 512> plain_buffer, size_t len);
-          std::int32_t peek(std::array<char, 512> plain_buffer, size_t len);
+          std::int32_t read(std::string& plain_buffer);
+          std::int32_t write(std::string plain_buffer);
+          std::int32_t peek(std::string& plain_buffer);
           void close();
+
+          User& user() {return(*m_user);}
+
+          bool isTlsUP() const {
+            return(m_isTlsUP);
+          }
+          void isTlsUP(bool val) {
+            m_isTlsUP = val;
+          }
+
       private:
           SSL *m_ssl;
           SSL_CTX *m_sslCtx;
+          User *m_user;
+          bool m_isTlsUP;
   };
 
   /// @brief the Client instance will be active object
@@ -149,16 +193,13 @@ namespace SMTP {
 
     public:
       ACE_INET_Addr m_smtpServerAddress;
-      //ACE_SSL_SOCK_Connector m_secureSmtpServerConnection;
-      //ACE_SSL_SOCK_Stream m_secureDataStream;
-      ACE_SOCK_Connector m_secureSmtpServerConnection;
-      ACE_SOCK_Stream m_secureDataStream;
+      ACE_SOCK_Connector m_connection;
+      ACE_SOCK_Stream m_stream;
       ACE_Message_Block *m_mb;
       bool m_mailServiceAvailable;
       User *m_user;
       ACE_Sig_Set ss;
       std::unique_ptr<ACE_Semaphore> m_semaphore;
-      std::unique_ptr<Tls> m_tls;;
   };
 
   /*  _ ___
@@ -386,6 +427,7 @@ namespace SMTP {
       std::uint32_t onCommand(std::string in, std::string& out, States& new_state);
   };
 
+
   class Account {
     public:
       Account() = default;
@@ -440,7 +482,9 @@ namespace SMTP {
         /// For secure smtp the port is 465 and plain smtp the port is 25.
         //m_client = std::make_unique<Client>(/*"smtp.gmail.com:465"*/"142.251.12.108:465", this);
         m_client = std::make_unique<Client>(25, "smtp.gmail.com", this);
-
+        m_tls = std::make_unique<Tls>(this);
+        
+        m_response.clear();
         account().email("naushad.dln@gmail.com").name("Naushad Ahmed")
                  .password("abcd").userid("naushad.dln");
       }
@@ -511,7 +555,8 @@ namespace SMTP {
       
       void client(std::unique_ptr<SMTP::Client> smtpClient);
       const std::unique_ptr<SMTP::Client>& client() const;
-      std::int32_t rx(std::string out);
+      std::int32_t rx(const std::string out);
+
       Account& account() {
         return(m_account);
       }
@@ -520,6 +565,9 @@ namespace SMTP {
         return(m_fsm);
       }
 
+      const std::unique_ptr<SMTP::Tls>& tls() const {
+        return(m_tls);
+      }
     private:
       Account m_account;
       std::string m_subject;
@@ -529,8 +577,12 @@ namespace SMTP {
       std::string m_data;
       /* Instance of SMTP User state is initialized with INIT */
       Transaction<States> m_fsm;
-      /* Instance of SMTP Client */
+      /* Instance of SMTP TCP Client */
       std::unique_ptr<Client> m_client;
+      /* Instance of SMTP TLS Client */
+      std::unique_ptr<Tls> m_tls;
+      /**/
+      std::unordered_map<Response, std::string, hFn> m_response;
   };
 
 }
