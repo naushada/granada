@@ -518,11 +518,14 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
 
     std::stringstream ss("");
     //ss << "DATA" << "\r\n";
-    
-    ss << "\r\nFrom: \"HNM Royal\" <hnm.royal@gmail.com>" << "\r\n"
-       << "To: <naushad.dln@gmail.com>" << "\r\n"
+    std::time_t result = std::time(nullptr);
+    ss << "MIME-Version: 1.0" << "\r\n"
+       << "Content-type: text/plain; charset=us-ascii" << "\r\n"
+       << "From: HM Royal <hnm.royal@gmail.com>" << "\r\n"
+       << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
        << "Subject: Test e-mail" << "\r\n"
-       << "\r\n" << "This is from SMTP Client\r\n" 
+       << "Date: " << std::asctime(std::localtime(&result)) << "\r\n\r\n"
+       << "This is from SMTP Client\r\n" 
        <<"\r\n"<< "." <<"\r\n";
     
 
