@@ -97,6 +97,23 @@ SMTP::Response SMTP::getSmtpStatusCode(const std::string in)
     return(it->first);
 }
 
+auto SMTP::find(const std::string in, std::string what)
+{
+    std::unordered_map<Response, std::string, hFn> out;
+    out.clear();
+    parseSmtpCommand(in, out);
+    auto it = out.begin();
+
+    for(; it != out.end(); ++it)
+    {
+        auto ent = it->first;
+        if(!what.compare(ent.m_statusCode)) {
+            break;
+        }
+    }
+    return(it);
+}
+
 std::uint32_t SMTP::getBase64(const std::string in, std::string& b64Out)
 {
     size_t out_len = 0;
@@ -144,16 +161,16 @@ std::uint32_t SMTP::GREETING::onResponse()
 
 std::uint32_t SMTP::GREETING::onResponse(std::string in, std::string& out, States& new_state)
 {
-    auto statusCode = getSmtpStatusCode(in);
+    auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
 
-    switch(statusCode.m_reply) {
-        case SMTP::STATUS_CODE_220_Service_ready:
+    switch(ent.m_reply) {
+        case SMTP::REPLY_CODE_220_Service_ready:
             display(in); 
             /* connection established successfully - send the next command */
             retStatus = onCommand(in, out, new_state);
         break;
-        case SMTP::STATUS_CODE_554_Transaction_has_failed:
+        case SMTP::REPLY_CODE_554_Transaction_has_failed:
         break;
         default:
             display(in);
@@ -177,8 +194,7 @@ std::uint32_t SMTP::GREETING::onCommand(std::string in, std::string& out, States
     out = ss.str();
     /// @brief moving to new state for processing of new command or request 
     new_state = HELO{};
-    //new_state = MAIL{};
-    return(0);
+    return(SMTP::status_code::GOTO_NEXT_STATE);
 }
 
 void SMTP::HELO::onEntry()
@@ -205,11 +221,11 @@ std::uint32_t SMTP::HELO::onResponse()
 
 std::uint32_t SMTP::HELO::onResponse(std::string in, std::string& out, States& new_state)
 {
-    auto statusCode = getSmtpStatusCode(in);
+    auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
 
-    switch(statusCode.m_reply) {
-        case SMTP::STATUS_CODE_250_Request_mail_action_okay_completed:
+    switch(ent.m_reply) {
+        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
@@ -222,22 +238,33 @@ std::uint32_t SMTP::HELO::onResponse(std::string in, std::string& out, States& n
 }
 
 /**
- * @brief This member method processes the incoming initial command from smtp server and sends EHLO - Extension Hello
- * 
+ * @brief This member method receives the response to TCP connect from SMTP server
+ *        In this response SMTP server provides the capabilities of SMTP server, This 
+ *        message is not encrypted.The SMTP client is checking to SMTP server to support
+ *        TLS over TCP.
  * @param in Greeting or Extension capabilities from smtp server
  * @param out response message to be sent to smtp server
  * @param new_state new state for processing of Extention cabalities 
  */
 std::uint32_t SMTP::HELO::onCommand(std::string in, std::string& out, States& new_state)
 {
-    std::stringstream ss("");
-    //ss << "MAIL FROM: HM Royal<hnm.royal@gmail.com>" << "\r\n";
-    ss << "STARTTLS" << "\r\n";
-    /// @brief modifiying out with response message to be sent to smtp server 
-    out = ss.str();
-    /// @brief moving to new state for processing of new command or request 
-    new_state = MAIL{};
-    return(0);
+    std::unordered_map<SMTP::Response, std::string, SMTP::hFn> elm;
+    elm.clear();
+    parseSmtpCommand(in, elm);
+    auto it = SMTP::find(in, "STARTTLS");
+
+    if(it != elm.end()) {
+        std::stringstream ss("");
+        ss << "STARTTLS" << "\r\n";
+        /// @brief modifiying out with response message to be sent to smtp server 
+        out = ss.str();
+        /// @brief moving to new state for processing of new command or request 
+        new_state = MAIL{};
+    } else {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l tls is not supported by SMTP server\n")));
+        return(static_cast<std::uint32_t>(SMTP::status_code::TLS_NOT_SUPPORTED));
+    }
+    return(SMTP::status_code::GOTO_NEXT_STATE);
 }
 
 void SMTP::MAIL::onEntry()
@@ -266,20 +293,20 @@ std::uint32_t SMTP::MAIL::onResponse()
 
 std::uint32_t SMTP::MAIL::onResponse(std::string in, std::string& out, States& new_state)
 {
-    auto statusCode = getSmtpStatusCode(in);
+    auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
 
-    switch(statusCode.m_reply) {
-        case SMTP::STATUS_CODE_530_5_7_0_Authentication_needed:
-        case SMTP::STATUS_CODE_334_Server_challenge:
-        case SMTP::STATUS_CODE_250_Request_mail_action_okay_completed:
+    switch(ent.m_reply) {
+        case SMTP::REPLY_CODE_530_5_7_0_Authentication_needed:
+        case SMTP::REPLY_CODE_334_Server_challenge:
+        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
-        case STATUS_CODE_535_5_7_8_Authentication_credentials_invalid:
+        case REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-        case STATUS_CODE_220_Service_ready:
+        case REPLY_CODE_220_Service_ready:
             /* switch to TLS */
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authnetication over tls started\n")));
             retStatus = onCommand(in, out, new_state);
@@ -304,43 +331,45 @@ std::uint32_t SMTP::MAIL::onCommand(std::string in, std::string& out, States& ne
         out = ss.str();
         m_authStage = AUTH_USRNAME;
         /// @brief remain in same state
-        return(1);
+        return(SMTP::status_code::REMAIN_IN_SAME_STATE);
+
     } else if(AUTH_USRNAME == m_authStage) {
         if(!onUsername(in, out)) {
             m_authStage = AUTH_PASSWORD;
         }
         /// @brief remain in same state
-        return(1);
+        return(SMTP::status_code::REMAIN_IN_SAME_STATE);
 
     } else if(AUTH_PASSWORD == m_authStage) {
         if(!onPassword(in, out)) { 
             m_authStage = AUTH_SUCCESS;
         }
         /// @brief remain in same state
-        return(1);
+        return(SMTP::status_code::REMAIN_IN_SAME_STATE);
+
     } else if(AUTH_SUCCESS == m_authStage) {
         if(!onLoginSuccess(in, out)) {
           ss << "RESET" << "\r\n";
           out = ss.str();
           m_authStage = AUTH_INIT;
           new_state = RESET{};
-          return(0);
+          return(SMTP::status_code::INCORRECT_LOGIN_CREDENTIALS);
+        } else {
+            new_state = RCPT{};
+            return(SMTP::status_code::GOTO_NEXT_STATE);
         }
     } 
-    /*go to next state */
-    new_state = RCPT{};
-    
-    return(0);
+    return(SMTP::status_code::ERROR_END);
 }
 
 std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Username)
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL function:%s\n"),__PRETTY_FUNCTION__));
     size_t out_len = 0;
-    auto status = SMTP::getSmtpStatusCode(in);
+    auto ent = SMTP::getSmtpStatusCode(in);
     
-    if((SMTP::STATUS_CODE_334_Server_challenge == status.m_reply) && !status.m_statusCode.empty()) {
-        const ACE_Byte* data = (ACE_Byte *)(status.m_statusCode.data());
+    if((SMTP::REPLY_CODE_334_Server_challenge == ent.m_reply) && !ent.m_statusCode.empty()) {
+        const ACE_Byte* data = (ACE_Byte *)(ent.m_statusCode.data());
         ACE_Byte* plain = ACE_Base64::decode(data, &out_len);
 
         if(plain) {
@@ -354,25 +383,27 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
                 base64Username = ss.str();
                 return(0);
             }
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL challenge for username:%s\n"),usrName.c_str()));
+            return(SMTP::status_code::CHALLENGE_FOR_USERNAME_FAILED);
         }
     }
-    return(1);
+    return(SMTP::status_code::BASE64_DECODING_FAILED);
 }
 
 std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Username)
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL function:%s\n"),__PRETTY_FUNCTION__));
     size_t out_len = 0;
-    auto status = SMTP::getSmtpStatusCode(in);
-    if(SMTP::STATUS_CODE_334_Server_challenge == status.m_reply && 
-       !status.m_statusCode.empty()) {
+    auto ent = SMTP::getSmtpStatusCode(in);
+    if(SMTP::REPLY_CODE_334_Server_challenge == ent.m_reply && 
+       !ent.m_statusCode.empty()) {
 
-        const ACE_Byte* data = (ACE_Byte *)(status.m_statusCode.data());
+        const ACE_Byte* data = (ACE_Byte *)(ent.m_statusCode.data());
         ACE_Byte* plain = ACE_Base64::decode(data, &out_len);
         if(plain) {
             std::string pwd((char *)plain, out_len);
             if(!pwd.compare("Password:")) {
-                std::string nm("");
+                std::string nm("bxgoglwmtbeukllb");
                 std::string b64_;
                 auto len = SMTP::getBase64(nm,b64_);
                 std::stringstream ss("");
@@ -380,18 +411,20 @@ std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Us
                 base64Username = ss.str();
                 return(0);
             }
+            ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL challenge for username:%s\n"),pwd.c_str()));
+            return(SMTP::status_code::CHALLENGE_FOR_PASSWORD_FAILED);
         }
     }
-    return(1);
+    return(SMTP::status_code::BASE64_DECODING_FAILED);
 }
 
 bool SMTP::MAIL::onLoginSuccess(const std::string in, std::string& out)
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL function:%s\n"),__PRETTY_FUNCTION__));
 
-    auto status = SMTP::getSmtpStatusCode(in);
-    if(SMTP::STATUS_CODE_235_2_7_0_Authentication_succeeded == status.m_reply && 
-       !status.m_statusCode.compare("2.7.0")) {
+    auto ent = SMTP::getSmtpStatusCode(in);
+    if(SMTP::REPLY_CODE_235_2_7_0_Authentication_succeeded == ent.m_reply && 
+       !ent.m_statusCode.compare("2.7.0")) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authentication over tls is sucessful\n")));
 
         std::stringstream ss("");
@@ -426,21 +459,20 @@ std::uint32_t SMTP::DATA::onResponse()
 
 std::uint32_t SMTP::DATA::onResponse(std::string in, std::string& out, States& new_state)
 {
-    auto statusCode = getSmtpStatusCode(in);
+    auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::DATA m_reply:%u m_statusCode:%s\n"), 
-              statusCode.m_reply, statusCode.m_statusCode.c_str()));
+              ent.m_reply, ent.m_statusCode.c_str()));
 
-    switch(statusCode.m_reply) {
-        case SMTP::STATUS_CODE_235_2_7_0_Authentication_succeeded:
+    switch(ent.m_reply) {
+        case SMTP::REPLY_CODE_235_2_7_0_Authentication_succeeded:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
-        case STATUS_CODE_535_5_7_8_Authentication_credentials_invalid:
+        case SMTP::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-        case STATUS_CODE_220_Service_ready:
-            /* switch to TLS */
+        case SMTP::REPLY_CODE_220_Service_ready:
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authnetication over tls started\n")));
             retStatus = onCommand(in, out, new_state);
         break;
@@ -462,7 +494,7 @@ std::uint32_t SMTP::DATA::onCommand(std::string in, std::string& out, States& ne
     out = ss.str();
  
     new_state = BODY{};
-    return(0);
+    return(SMTP::status_code::GOTO_NEXT_STATE);
 }
 
 void SMTP::BODY::onEntry()
@@ -487,22 +519,20 @@ std::uint32_t SMTP::BODY::onResponse()
 }
 std::uint32_t SMTP::BODY::onResponse(std::string in, std::string& out, States& new_state)
 {
-    auto statusCode = getSmtpStatusCode(in);
+    auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY m_reply:%u m_statusCode:%s\n"), 
-              statusCode.m_reply, statusCode.m_statusCode.c_str()));
+              ent.m_reply, ent.m_statusCode.c_str()));
 
-    switch(statusCode.m_reply) {
-        case SMTP::STATUS_CODE_250_Request_mail_action_okay_completed:
+    switch(ent.m_reply) {
+        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
-        case STATUS_CODE_535_5_7_8_Authentication_credentials_invalid:
+        case SMTP::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-        case STATUS_CODE_220_Service_ready:
-            /* switch to TLS */
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authnetication over tls started\n")));
+        case SMTP::REPLY_CODE_220_Service_ready:
             retStatus = onCommand(in, out, new_state);
         break;
         default:
@@ -517,15 +547,17 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
 {
 
     std::stringstream ss("");
-    //ss << "DATA" << "\r\n";
     std::time_t result = std::time(nullptr);
+    /// MIME Header
     ss << "MIME-Version: 1.0" << "\r\n"
        << "Content-type: text/plain; charset=us-ascii" << "\r\n"
        << "From: HM Royal <hnm.royal@gmail.com>" << "\r\n"
        << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
        << "Subject: Test e-mail" << "\r\n"
        << "Date: " << std::asctime(std::localtime(&result)) << "\r\n\r\n"
+       /// MIME Header end
        << "This is from SMTP Client\r\n" 
+       /// email body ends with dot
        <<"\r\n"<< "." <<"\r\n";
     
 
@@ -533,7 +565,8 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
     out = ss.str();
  
     new_state = QUIT{};
-    return(1);
+    return(SMTP::status_code::GOTO_NEXT_STATE);
+
 }
 
 void SMTP::RCPT::onEntry()
@@ -559,22 +592,20 @@ std::uint32_t SMTP::RCPT::onResponse()
 
 std::uint32_t SMTP::RCPT::onResponse(std::string in, std::string& out, States& new_state)
 {
-    auto statusCode = getSmtpStatusCode(in);
+    auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::RCPT m_reply:%u m_statusCode:%s\n"), 
-              statusCode.m_reply, statusCode.m_statusCode.c_str()));
+              ent.m_reply, ent.m_statusCode.c_str()));
 
-    switch(statusCode.m_reply) {
-        case SMTP::STATUS_CODE_250_Request_mail_action_okay_completed:
+    switch(ent.m_reply) {
+        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
-        case STATUS_CODE_535_5_7_8_Authentication_credentials_invalid:
+        case SMTP::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-        case STATUS_CODE_220_Service_ready:
-            /* switch to TLS */
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authnetication over tls started\n")));
+        case SMTP::REPLY_CODE_220_Service_ready:
             retStatus = onCommand(in, out, new_state);
         break;
         default:
@@ -594,7 +625,7 @@ std::uint32_t SMTP::RCPT::onCommand(std::string in, std::string& out, States& ne
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
     new_state = DATA{};
-    return(0);
+    return(SMTP::status_code::GOTO_NEXT_STATE);
 }
 
 void SMTP::QUIT::onEntry()
@@ -621,7 +652,9 @@ std::uint32_t SMTP::QUIT::onResponse()
 
 std::uint32_t SMTP::QUIT::onResponse(std::string in, std::string& out, States& new_state)
 {
-
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::QUIT Terminating email session\n")));
+    auto ret = onCommand(in, out, new_state);
+    return(SMTP::status_code::END_EMAIL_TRANSACTION);
 }
 
 std::uint32_t SMTP::QUIT::onCommand(std::string in, std::string& out, States& new_state)
@@ -791,9 +824,9 @@ std::uint32_t SMTP::HELP::onResponse()
 
 std::uint32_t SMTP::HELP::onResponse(std::string in, std::string& out, States& new_state)
 {
-    auto statusCode = SMTP::getSmtpStatusCode(in);
-    switch(statusCode.m_reply) {
-        case SMTP::STATUS_CODE_250_Request_mail_action_okay_completed:
+    auto ent = SMTP::getSmtpStatusCode(in);
+    switch(ent.m_reply) {
+        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
         break;
         default:
         break;

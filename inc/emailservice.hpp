@@ -44,8 +44,9 @@ namespace SMTP {
         std::string m_statusCode;
         bool operator==(const Response& rp) const {
         //return(m_reply == rp.m_reply && m_statusCode == rp.m_statusCode);
-        return(m_reply == rp.m_reply);
-    }
+            return(m_reply == rp.m_reply);
+        }
+
     Response() = default;
     ~Response() = default;
     
@@ -67,54 +68,69 @@ namespace SMTP {
   std::uint32_t parseSmtpCommand(const std::string in, std::unordered_map<Response, std::string, hFn>& out);
   SMTP::Response getSmtpStatusCode(const std::string in);
   std::uint32_t getBase64(const std::string in, std::string& b64Out);
+  auto find(const std::string in, std::string what);
   void display(std::string in);
 
-  enum statusCode: std::uint32_t {
-    STATUS_CODE_214_Response_to_HELP = 214,
-    STATUS_CODE_211_System_status = 211,
-    STATUS_CODE_220_Service_ready = 220,
-    STATUS_CODE_221_Service_closing_transmission_channel = 221,
-    //STATUS_CODE_221_2_0_0_Goodbye = 211,
-    STATUS_CODE_235_2_7_0_Authentication_succeeded = 235,
-    STATUS_CODE_240_Quit = 240,
-    STATUS_CODE_250_Request_mail_action_okay_completed = 250,
-    STATUS_CODE_251_User_not_local_will_forward = 251,
-    STATUS_CODE_252_Can_not_verify_the_user = 252,
-    STATUS_CODE_334_Server_challenge = 334,
-    //STATUS_CODE_354_Start_mail_input = 354,
+  enum replyCode: std::uint32_t {
+    REPLY_CODE_214_Response_to_HELP = 214,
+    REPLY_CODE_211_System_status = 211,
+    REPLY_CODE_220_Service_ready = 220,
+    REPLY_CODE_221_Service_closing_transmission_channel = 221,
+    //REPLY_CODE_221_2_0_0_Goodbye = 211,
+    REPLY_CODE_235_2_7_0_Authentication_succeeded = 235,
+    REPLY_CODE_240_Quit = 240,
+    REPLY_CODE_250_Request_mail_action_okay_completed = 250,
+    REPLY_CODE_251_User_not_local_will_forward = 251,
+    REPLY_CODE_252_Can_not_verify_the_user = 252,
+    REPLY_CODE_334_Server_challenge = 334,
+    //REPLY_CODE_354_Start_mail_input = 354,
     /* -ve status code */
-    STATUS_CODE_432_4_7_12_A_password_transition_needed = 432,
-    STATUS_CODE_421_Service_not_available_closing_channel = 421,
-    STATUS_CODE_450_Requested_mail_action_not_taken = 450,
-    STATUS_CODE_451_4_4_1_IMAP_server_unavailable = 451,
-    //STATUS_CODE_451_Requested_action_aborted = 451,
-    STATUS_CODE_452_Requested_action_not_taken = 451,
-    STATUS_CODE_454_4_7_0_Temporary_authentication_failure = 454,
-    STATUS_CODE_455_Server_unable_to_accomodate_parameters = 455,
+    REPLY_CODE_432_4_7_12_A_password_transition_needed = 432,
+    REPLY_CODE_421_Service_not_available_closing_channel = 421,
+    REPLY_CODE_450_Requested_mail_action_not_taken = 450,
+    REPLY_CODE_451_4_4_1_IMAP_server_unavailable = 451,
+    //REPLY_CODE_451_Requested_action_aborted = 451,
+    REPLY_CODE_452_Requested_action_not_taken = 451,
+    REPLY_CODE_454_4_7_0_Temporary_authentication_failure = 454,
+    REPLY_CODE_455_Server_unable_to_accomodate_parameters = 455,
     /* -ve status code */
-    STATUS_CODE_500_Syntax_error_command_unrecognized = 500,
-    STATUS_CODE_500_5_5_6_Authentication_exchange_line_too_long = 500,
-    STATUS_CODE_501_Syntax_error_in_parameters = 501,
-    //STATUS_CODE_501_5_5_2_Cannot_base64_decode_client_response = 501,
-    //STATUS_CODE_501_5_7_0_Client_initiated_authentication_exchange = 501,
-    STATUS_CODE_502_Command_not_implemented = 502,
-    STATUS_CODE_503_Bad_sequence_of_command = 503,
-    STATUS_CODE_504_Command_parameter_is_not_implemented = 504,
-    //STATUS_CODE_504_5_5_4_Unrecognized_authentication_type = 504,
-    STATUS_CODE_521_Server_does_not_accept_mail = 521,
-    STATUS_CODE_523_Encryption_needed = 523,
-    STATUS_CODE_530_5_7_0_Authentication_needed = 530,
-    STATUS_CODE_534_5_7_9_Authentication_mechanism_is_too_weak = 534,
-    STATUS_CODE_535_5_7_8_Authentication_credentials_invalid = 535,
-    STATUS_CODE_538_5_7_11_Encryption_required = 538,
-    STATUS_CODE_550_Requested_action_not_taken = 550,
-    STATUS_CODE_551_User_not_local = 551,
-    STATUS_CODE_552_Requested_mail_action_aborted = 552,
-    STATUS_CODE_553_Requested_action_not_taken = 553,
-    STATUS_CODE_554_Transaction_has_failed = 554,
-    //STATUS_CODE_554_5_3_4_Message_too_big_for_system = 554,
-    STATUS_CODE_556_Domain_does_not_accept_mail = 556
+    REPLY_CODE_500_Syntax_error_command_unrecognized = 500,
+    REPLY_CODE_500_5_5_6_Authentication_exchange_line_too_long = 500,
+    REPLY_CODE_501_Syntax_error_in_parameters = 501,
+    //REPLY_CODE_501_5_5_2_Cannot_base64_decode_client_response = 501,
+    //REPLY_CODE_501_5_7_0_Client_initiated_authentication_exchange = 501,
+    REPLY_CODE_502_Command_not_implemented = 502,
+    REPLY_CODE_503_Bad_sequence_of_command = 503,
+    REPLY_CODE_504_Command_parameter_is_not_implemented = 504,
+    //REPLY_CODE_504_5_5_4_Unrecognized_authentication_type = 504,
+    REPLY_CODE_521_Server_does_not_accept_mail = 521,
+    REPLY_CODE_523_Encryption_needed = 523,
+    REPLY_CODE_530_5_7_0_Authentication_needed = 530,
+    REPLY_CODE_534_5_7_9_Authentication_mechanism_is_too_weak = 534,
+    REPLY_CODE_535_5_7_8_Authentication_credentials_invalid = 535,
+    REPLY_CODE_538_5_7_11_Encryption_required = 538,
+    REPLY_CODE_550_Requested_action_not_taken = 550,
+    REPLY_CODE_551_User_not_local = 551,
+    REPLY_CODE_552_Requested_mail_action_aborted = 552,
+    REPLY_CODE_553_Requested_action_not_taken = 553,
+    REPLY_CODE_554_Transaction_has_failed = 554,
+    //REPLY_CODE_554_5_3_4_Message_too_big_for_system = 554,
+    REPLY_CODE_556_Domain_does_not_accept_mail = 556
 
+  };
+
+  enum status_code : std::uint32_t {
+      OK = 0,
+      TLS_NOT_SUPPORTED = 1,
+      END_EMAIL_TRANSACTION,
+      REMAIN_IN_SAME_STATE,
+      GOTO_NEXT_STATE,
+      /* Expecting Username: for challenge from SMTP server */
+      CHALLENGE_FOR_USERNAME_FAILED,
+      CHALLENGE_FOR_PASSWORD_FAILED,
+      BASE64_DECODING_FAILED,
+      INCORRECT_LOGIN_CREDENTIALS,
+      ERROR_END
   };
 
   //std::unordered_map<statusCode_t, std::string>statusCodeUMap;

@@ -131,6 +131,7 @@ int SMTP::Client::svc(void) {
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l semaphore is released and going into main-loop\n")));
   main();
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l active object is stopped now\n")));
+  return(-1);
 }
 
 int SMTP::Client::open(void *args) {
@@ -271,6 +272,8 @@ void SMTP::Client::main()
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l entry_fn:%s \n"), __PRETTY_FUNCTION__));
     ACE_Time_Value to(1,0);
     while(m_mailServiceAvailable) ACE_Reactor::instance()->handle_events(to);
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l active object cease to exists\n")));
 }
 
 void SMTP::Client::stop()
@@ -308,6 +311,8 @@ std::int32_t SMTP::User::startEmailTransaction()
 std::int32_t SMTP::User::endEmailTransaction()
 {
   std::int32_t ret = 0;
+  m_client.reset(nullptr);
+
   return(ret);
 }
 
@@ -323,41 +328,48 @@ std::int32_t SMTP::User::rx(const std::string in)
     std::string cmd("");
     SMTP::States new_state;
   
-    auto status = SMTP::getSmtpStatusCode(in);
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l m_status:%u \n"), status.m_reply));
-    switch(status.m_reply) {
+    auto ent = SMTP::getSmtpStatusCode(in);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l m_status:%u \n"), ent.m_reply));
+    switch(ent.m_reply) {
 
-        case SMTP::STATUS_CODE_220_Service_ready:
+        case SMTP::REPLY_CODE_220_Service_ready:
         {
-            if(!status.m_statusCode.compare("2.0.0")) {
+            if(!ent.m_statusCode.compare("2.0.0")) {
                 /* Reply to STARTTLS command - switch to TLS now */
                 m_tls->start(client()->get_handle());
-                auto result = fsm().onRx(in, cmd, new_state);
-                /// @brief  send the response for received request.
-                if(cmd.length()) {
-                    //ret = m_secureDataStream.send_n(out.c_str(), out.length());
-                    auto len = m_tls->write(cmd);
+            }
+
+            auto result = fsm().onRx(in, cmd, new_state);
+            /// @brief  send the response for received request.
+            if(cmd.length()) {
+                size_t len = -1;
+                if(tls()->isTlsUP()) {
+                    len = m_tls->write(cmd);
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent over tls length:%d command:%s\n"), len, cmd.c_str()));
+                } else {
+                    len = client()->tx(cmd);
+                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent tover plain tcp length:%d command:%s\n"), len, cmd.c_str()));
                 }
-                /// @brief  move to new state for processing of next Request.
-                if(!result) {
+            }
+
+            /// @brief  move to new state for processing of next Request.
+            switch(result) {
+                case SMTP::status_code::GOTO_NEXT_STATE:
+                    /// @brief  move to new state for processing of next Request.
                     fsm().set_state(new_state);
-                }
-            } else {
-                /* This is a grreting from SMTP server upon TCP connection establishment */
-                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l greeting from smtp server length:%d command:%s\n"), 
-                         in.length(), in.c_str()));
-                auto result = fsm().onRx(in, cmd, new_state);
-                /// @brief  send the response for received request.
-                if(cmd.length()) {
-                    //ret = m_secureDataStream.send_n(out.c_str(), out.length());
-                    auto len = client()->tx(cmd);
-                    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent over plain tcp length:%d command:%s\n"), len, cmd.c_str()));
-                }
-                /// @brief  move to new state for processing of next Request.
-                if(!result) {
-                    fsm().set_state(new_state);
-                }
+                break;
+              
+                case SMTP::status_code::REMAIN_IN_SAME_STATE:
+                    /// @brief  stay in same state as authentication is in progress.
+                break;
+                case SMTP::status_code::END_EMAIL_TRANSACTION:
+                case SMTP::status_code::CHALLENGE_FOR_USERNAME_FAILED:
+                case SMTP::status_code::CHALLENGE_FOR_PASSWORD_FAILED:
+                case SMTP::status_code::BASE64_DECODING_FAILED:
+                default:
+                    endEmailTransaction();
+                break;
+
             }
         }
         break;
@@ -367,7 +379,6 @@ std::int32_t SMTP::User::rx(const std::string in)
             auto result = fsm().onRx(in, cmd, new_state);
             /// @brief  send the response for received request.
             if(cmd.length()) {
-                //ret = m_secureDataStream.send_n(out.c_str(), out.length());
                 size_t len = -1;
                 if(tls()->isTlsUP()) {
                     len = m_tls->write(cmd);
@@ -377,13 +388,30 @@ std::int32_t SMTP::User::rx(const std::string in)
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sen tover plain tcp length:%d command:%s\n"), len, cmd.c_str()));
                 }
             }
-            /// @brief  move to new state for processing of next Request.
-            if(!result) {
-                fsm().set_state(new_state);
+
+            switch(result) {
+                case SMTP::status_code::GOTO_NEXT_STATE:
+                    /// @brief  move to new state for processing of next Request.
+                    fsm().set_state(new_state);
+                break;
+              
+                case SMTP::status_code::REMAIN_IN_SAME_STATE:
+                    /// @brief  stay in same state as authentication is in progress.
+                break;
+                case SMTP::status_code::END_EMAIL_TRANSACTION:
+                case SMTP::status_code::CHALLENGE_FOR_USERNAME_FAILED:
+                case SMTP::status_code::CHALLENGE_FOR_PASSWORD_FAILED:
+                case SMTP::status_code::BASE64_DECODING_FAILED:
+                default:
+                    endEmailTransaction();
+                break;
+
             }
         }
         break;
     }
+
+    return(0);
 }
 
 /**
