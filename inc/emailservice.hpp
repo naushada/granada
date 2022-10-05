@@ -43,7 +43,6 @@ namespace SMTP {
         std::uint32_t m_reply;
         std::string m_statusCode;
         bool operator==(const Response& rp) const {
-        //return(m_reply == rp.m_reply && m_statusCode == rp.m_statusCode);
             return(m_reply == rp.m_reply);
         }
 
@@ -71,7 +70,7 @@ namespace SMTP {
   auto find(const std::string in, std::string what);
   void display(std::string in);
 
-  enum replyCode: std::uint32_t {
+  enum reply_code: std::uint32_t {
     REPLY_CODE_214_Response_to_HELP = 214,
     REPLY_CODE_211_System_status = 211,
     REPLY_CODE_220_Service_ready = 220,

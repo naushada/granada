@@ -165,12 +165,12 @@ std::uint32_t SMTP::GREETING::onResponse(std::string in, std::string& out, State
     auto retStatus = 0;
 
     switch(ent.m_reply) {
-        case SMTP::REPLY_CODE_220_Service_ready:
+        case SMTP::reply_code::REPLY_CODE_220_Service_ready:
             display(in); 
             /* connection established successfully - send the next command */
             retStatus = onCommand(in, out, new_state);
         break;
-        case SMTP::REPLY_CODE_554_Transaction_has_failed:
+        case SMTP::reply_code::REPLY_CODE_554_Transaction_has_failed:
         break;
         default:
             display(in);
@@ -225,7 +225,7 @@ std::uint32_t SMTP::HELO::onResponse(std::string in, std::string& out, States& n
     auto retStatus = 0;
 
     switch(ent.m_reply) {
-        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
+        case SMTP::reply_code::REPLY_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
@@ -297,16 +297,16 @@ std::uint32_t SMTP::MAIL::onResponse(std::string in, std::string& out, States& n
     auto retStatus = 0;
 
     switch(ent.m_reply) {
-        case SMTP::REPLY_CODE_530_5_7_0_Authentication_needed:
-        case SMTP::REPLY_CODE_334_Server_challenge:
-        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
+        case SMTP::reply_code::REPLY_CODE_530_5_7_0_Authentication_needed:
+        case SMTP::reply_code::REPLY_CODE_334_Server_challenge:
+        case SMTP::reply_code::REPLY_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
-        case REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
+        case SMTP::reply_code::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-        case REPLY_CODE_220_Service_ready:
+        case SMTP::reply_code::REPLY_CODE_220_Service_ready:
             /* switch to TLS */
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authnetication over tls started\n")));
             retStatus = onCommand(in, out, new_state);
@@ -368,7 +368,7 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
     size_t out_len = 0;
     auto ent = SMTP::getSmtpStatusCode(in);
     
-    if((SMTP::REPLY_CODE_334_Server_challenge == ent.m_reply) && !ent.m_statusCode.empty()) {
+    if((SMTP::reply_code::REPLY_CODE_334_Server_challenge == ent.m_reply) && !ent.m_statusCode.empty()) {
         const ACE_Byte* data = (ACE_Byte *)(ent.m_statusCode.data());
         ACE_Byte* plain = ACE_Base64::decode(data, &out_len);
 
@@ -395,7 +395,7 @@ std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Us
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL function:%s\n"),__PRETTY_FUNCTION__));
     size_t out_len = 0;
     auto ent = SMTP::getSmtpStatusCode(in);
-    if(SMTP::REPLY_CODE_334_Server_challenge == ent.m_reply && 
+    if(SMTP::reply_code::REPLY_CODE_334_Server_challenge == ent.m_reply && 
        !ent.m_statusCode.empty()) {
 
         const ACE_Byte* data = (ACE_Byte *)(ent.m_statusCode.data());
@@ -423,7 +423,7 @@ bool SMTP::MAIL::onLoginSuccess(const std::string in, std::string& out)
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL function:%s\n"),__PRETTY_FUNCTION__));
 
     auto ent = SMTP::getSmtpStatusCode(in);
-    if(SMTP::REPLY_CODE_235_2_7_0_Authentication_succeeded == ent.m_reply && 
+    if(SMTP::reply_code::REPLY_CODE_235_2_7_0_Authentication_succeeded == ent.m_reply && 
        !ent.m_statusCode.compare("2.7.0")) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authentication over tls is sucessful\n")));
 
@@ -465,14 +465,14 @@ std::uint32_t SMTP::DATA::onResponse(std::string in, std::string& out, States& n
               ent.m_reply, ent.m_statusCode.c_str()));
 
     switch(ent.m_reply) {
-        case SMTP::REPLY_CODE_235_2_7_0_Authentication_succeeded:
+        case SMTP::reply_code::REPLY_CODE_235_2_7_0_Authentication_succeeded:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
-        case SMTP::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
+        case SMTP::reply_code::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-        case SMTP::REPLY_CODE_220_Service_ready:
+        case SMTP::reply_code::REPLY_CODE_220_Service_ready:
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authnetication over tls started\n")));
             retStatus = onCommand(in, out, new_state);
         break;
@@ -489,7 +489,6 @@ std::uint32_t SMTP::DATA::onCommand(std::string in, std::string& out, States& ne
 
     std::stringstream ss("");
     ss << "DATA" << "\r\n";
-    //ss << "RCPT TO: <naushad.dln@gmail.com>" << "\r\n";
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
  
@@ -525,14 +524,14 @@ std::uint32_t SMTP::BODY::onResponse(std::string in, std::string& out, States& n
               ent.m_reply, ent.m_statusCode.c_str()));
 
     switch(ent.m_reply) {
-        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
+        case SMTP::reply_code::REPLY_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
-        case SMTP::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
+        case SMTP::reply_code::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-        case SMTP::REPLY_CODE_220_Service_ready:
+        case SMTP::reply_code::REPLY_CODE_220_Service_ready:
             retStatus = onCommand(in, out, new_state);
         break;
         default:
@@ -598,14 +597,14 @@ std::uint32_t SMTP::RCPT::onResponse(std::string in, std::string& out, States& n
               ent.m_reply, ent.m_statusCode.c_str()));
 
     switch(ent.m_reply) {
-        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
+        case SMTP::reply_code::REPLY_CODE_250_Request_mail_action_okay_completed:
             display(in);
             retStatus = onCommand(in, out, new_state);
         break;
-        case SMTP::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
+        case SMTP::reply_code::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         
         break;
-        case SMTP::REPLY_CODE_220_Service_ready:
+        case SMTP::reply_code::REPLY_CODE_220_Service_ready:
             retStatus = onCommand(in, out, new_state);
         break;
         default:
@@ -826,7 +825,7 @@ std::uint32_t SMTP::HELP::onResponse(std::string in, std::string& out, States& n
 {
     auto ent = SMTP::getSmtpStatusCode(in);
     switch(ent.m_reply) {
-        case SMTP::REPLY_CODE_250_Request_mail_action_okay_completed:
+        case SMTP::reply_code::REPLY_CODE_250_Request_mail_action_okay_completed:
         break;
         default:
         break;
