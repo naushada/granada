@@ -445,50 +445,86 @@ namespace SMTP {
 
   class Account {
     public:
-      Account() = default;
-      ~Account() = default;
 
-      Account& name(std::string in) {
-        m_name = in;
+      static Account& instance() {
+        static Account inst;
+        return(inst);
+      }
+      
+      Account(const Account& acc) = delete;
+      const Account& operator=(const Account&) = delete;
+
+      Account& from_name(std::string in) {
+        m_from_name = in;
         return(*this);
       }
 
-      std::string name() const {
-        return(m_name);
+      std::string from_name() const {
+        return(m_from_name);
       }
 
-      Account& email(std::string in) {
-        m_email = in;
+      Account& from_email(std::string in) {
+        m_from_email = in;
         return(*this);
       }
 
-      std::string email() const {
-        return(m_email);
+      std::string from_email() const {
+        return(m_from_email);
       }
 
-      Account& userid(std::string in) {
-        m_userid = in;
+      Account& from_password(std::string in) {
+        m_from_password = in;
         return(*this);
       }
 
-      std::string userid() const {
-        return(m_userid);
+      std::string from_password() const {
+        return(m_from_password);
       }
 
-      Account& password(std::string in) {
-        m_password = in;
+      Account& to_email(std::vector<std::string> to_list) {
+        m_to_email = to_list;
         return(*this);
       }
 
-      std::string password() const {
-        return(m_password);
+      std::vector<std::string> to_email() const {
+        return(m_to_email);
+      }
+
+      Account& email_body(std::string in) {
+        m_email_body = in;
+        return(*this);
+      }
+
+      std::string email_body() const {
+        return(m_email_body);
+      }
+
+      Account& email_subject(std::string in) {
+        m_email_subject = in;
+        return(*this);
+      }
+
+      std::string email_subject() const {
+        return(m_email_subject);
       }
 
     private:
-      std::string m_name;
-      std::string m_email;
-      std::string m_userid;
-      std::string m_password;
+
+      Account() {
+         m_from_name.clear();
+         m_from_email.clear();
+         m_from_password.clear();
+         m_to_email.clear();
+         m_email_body.clear(); 
+         m_email_subject.clear();
+      }
+            
+      std::string m_from_name;
+      std::string m_from_email;
+      std::string m_from_password;
+      std::vector<std::string> m_to_email;
+      std::string m_email_subject;
+      std::string m_email_body;
   };
 
   class User {
@@ -500,81 +536,15 @@ namespace SMTP {
         m_tls = std::make_unique<Tls>(this);
         
         m_response.clear();
-        account().email("naushad.dln@gmail.com").name("Naushad Ahmed")
-                 .password("abcd").userid("naushad.dln");
       }
 
       ~User();
       std::int32_t startEmailTransaction();
       std::int32_t endEmailTransaction();
-      /**
-       * @brief This member function stores the email id for to list
-       * 
-       * @param toList list of email id for to list
-       */
-      SMTP::User& to(std::vector<std::string> toList);
-      /**
-       * @brief This member function stores the email id for cc list
-       * 
-       * @param ccList list of email id for cc list
-       */
-      SMTP::User& cc(std::vector<std::string> ccList);
-      /**
-       * @brief This member function stores the email id for bcc list
-       * 
-       * @param bccList list of email id for bcc list
-       */
-      SMTP::User& bcc(std::vector<std::string> bccList);
-      /**
-       * @brief This member function returns the list of email id of to list
-       * 
-       * @return std::vector<std::string>& list of email id for to list
-       */
-      const std::vector<std::string>& to() const;
-      /**
-       * @brief This member function returns the list of email id of cc list
-       * 
-       * @return std::vector<std::string>& list of email id for cc list
-       */
-      const std::vector<std::string>& cc() const;
-      /**
-       * @brief This member function returns the list of email id of bcc list
-       * 
-       * @return std::vector<std::string>& list of email id for bcc list
-       */
-      const std::vector<std::string>& bcc() const;
-      /**
-       * @brief This member function stores the subject of e-mail
-       * 
-       * @param subj email subject
-       */
-      SMTP::User& subject(std::string subj);
-      /**
-       * @brief This member function returns the subject of the e-mail
-       * 
-       * @return std::string& subject title of e-mail
-       */
-      const std::string& subject() const;
-      /**
-       * @brief This member function stores the e-mail body 
-       * 
-       * @param emailBody email body
-       */
-      SMTP::User& data(std::string emailBody);
-      /**
-       * @brief This member function return the email body
-       * 
-       * @return std::string& email body
-       */
-      const std::string& data() const;
       
       void client(std::unique_ptr<SMTP::Client> smtpClient);
       const std::unique_ptr<SMTP::Client>& client() const;
       std::int32_t rx(const std::string out);
-
-      Account& account() {
-        return(m_account);
-      }
 
       auto& fsm() {
         return(m_fsm);
@@ -583,13 +553,8 @@ namespace SMTP {
       const std::unique_ptr<SMTP::Tls>& tls() const {
         return(m_tls);
       }
+
     private:
-      Account m_account;
-      std::string m_subject;
-      std::vector<std::string> m_to;
-      std::vector<std::string> m_cc;
-      std::vector<std::string> m_bcc;
-      std::string m_data;
       /* Instance of SMTP User state is initialized with INIT */
       Transaction<States> m_fsm;
       /* Instance of SMTP TCP Client */

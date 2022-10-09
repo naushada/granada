@@ -375,7 +375,8 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
         if(plain) {
             std::string usrName((char *)plain, out_len);
             if(!usrName.compare("Username:")) {
-                std::string nm("hnm.royal@gmail.com");
+                std::string nm = Account::instance().from_email();
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l username:%s\n"), Account::instance().from_email().c_str()));
                 std::string b64_;
                 auto len = SMTP::getBase64(nm, b64_);
                 std::stringstream ss("");
@@ -403,7 +404,7 @@ std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Us
         if(plain) {
             std::string pwd((char *)plain, out_len);
             if(!pwd.compare("Password:")) {
-                std::string nm("bxgoglwmtbeukllb");
+                std::string nm = Account::instance().from_password();
                 std::string b64_;
                 auto len = SMTP::getBase64(nm,b64_);
                 std::stringstream ss("");
@@ -428,7 +429,7 @@ bool SMTP::MAIL::onLoginSuccess(const std::string in, std::string& out)
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL authentication over tls is sucessful\n")));
 
         std::stringstream ss("");
-        ss << "MAIL FROM: <hnm.royal@gmail.com>" << "\r\n";
+        ss << "MAIL FROM: <" << Account::instance().from_email() << ">\r\n";
         /// @brief modifiying out with response message to be sent to smtp server 
         out = ss.str();
         return(true);
@@ -550,13 +551,16 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
     /// MIME Header
     ss << "MIME-Version: 1.0" << "\r\n"
        << "Content-type: text/plain; charset=us-ascii" << "\r\n"
-       << "From: HM Royal <hnm.royal@gmail.com>" << "\r\n"
+       //<< "From: HM Royal <hnm.royal@gmail.com>" << "\r\n"
+       << "From: "<<  Account::instance().from_name() << " <" << Account::instance().from_email() << ">\r\n"
        << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
+       //<< "To: " << Account::instance().
        //<< "To: Mohd Naushad Ahmed <mahmed@sierrawireless.com>" << "\r\n"
-       << "Subject: Test e-mail" << "\r\n"
+       << "Subject: " << Account::instance().email_subject() <<"\r\n"
        << "Date: " << std::asctime(std::localtime(&result)) << "\r\n\r\n"
        /// MIME Header end
-       << "This is from SMTP Client\r\n" 
+       //<< "This is from SMTP Client\r\n" 
+       << Account::instance().email_body() << "\r\n"
        /// email body ends with dot
        <<"\r\n"<< "." <<"\r\n";
     

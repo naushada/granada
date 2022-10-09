@@ -131,7 +131,7 @@ int SMTP::Client::svc(void) {
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l semaphore is released and going into main-loop\n")));
   main();
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l active object is stopped now\n")));
-  return(-1);
+  return(0);
 }
 
 int SMTP::Client::open(void *args) {
@@ -302,6 +302,11 @@ SMTP::User::~User()
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l dtor of User\n")));
 }
 
+/**
+ * @brief This is the entry function for e-mail client.
+ * 
+ * @return std::int32_t 
+ */
 std::int32_t SMTP::User::startEmailTransaction()
 {
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l entry_fn:%s \n"), __PRETTY_FUNCTION__));
@@ -424,111 +429,6 @@ std::int32_t SMTP::User::rx(const std::string in)
     }
 
     return(0);
-}
-
-/**
- * @brief This member function stores the email id for to list
- * 
- * @param toList list of email id for to list
- */
-SMTP::User& SMTP::User::to(std::vector<std::string> toList)
-{
-  m_to = toList;
-  return(*this);
-}
-
-/**
- * @brief This member function stores the email id for cc list
- * 
- * @param ccList list of email id for cc list
- */
-SMTP::User& SMTP::User::cc(std::vector<std::string> ccList)
-{
-  m_cc = ccList;
-  return(*this);
-}
-
-/**
- * @brief This member function stores the email id for bcc list
- * 
- * @param bccList list of email id for bcc list
- */
-SMTP::User& SMTP::User::bcc(std::vector<std::string> bccList)
-{
-  m_bcc = bccList;
-  return(*this);
-}
-
-/**
- * @brief This member function returns the list of email id of to list
- * 
- * @return std::vector<std::string>& list of email id for to list
- */
-const std::vector<std::string>& SMTP::User::to() const
-{
-  return(m_to);
-}
-
-/**
- * @brief This member function returns the list of email id of cc list
- * 
- * @return std::vector<std::string>& list of email id for cc list
- */
-const std::vector<std::string>& SMTP::User::cc() const
-{
-  return(m_cc);
-}
-
-/**
- * @brief This member function returns the list of email id of bcc list
- * 
- * @return std::vector<std::string>& list of email id for bcc list
- */
-const std::vector<std::string>& SMTP::User::bcc() const
-{
-  return(m_bcc);
-}
-
-/**
- * @brief This member function stores the subject of e-mail
- * 
- * @param subj email subject
- */
-SMTP::User& SMTP::User::subject(std::string subj)
-{
-  m_subject = subj;
-  return(*this);
-}
-
-/**
- * @brief This member function returns the subject of the e-mail
- * 
- * @return std::string& subject title of e-mail
- */
-const std::string& SMTP::User::subject() const
-{
-  return(m_subject);
-}
-
-/**
- * @brief This member function stores the e-mail body 
- * 
- * @param emailBody email body
- */
-SMTP::User& SMTP::User::data(std::string emailBody)
-{
-  m_data = emailBody;
-  return(*this);
-}
-
-/**
- * @brief This member function return the email body
- * 
- * @return std::string& email body
- */
-const std::string& SMTP::User::data() const
-{
-  return(m_data);
 }
 
 void SMTP::User::client(std::unique_ptr<SMTP::Client> smtpClient)

@@ -58,6 +58,9 @@ enum class CommandArgumentName : std::uint32_t {
     DB_URI,
     DB_CONN_POOL,
     DB_NAME,
+    EMAIL_FROM_NAME,
+    EMAIL_FROM_ID,
+    EMAIL_FROM_PASSWORD,
     MAX_CMD_ARG
 };
 
