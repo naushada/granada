@@ -552,6 +552,7 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
        << "Content-type: text/plain; charset=us-ascii" << "\r\n"
        << "From: HM Royal <hnm.royal@gmail.com>" << "\r\n"
        << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
+       //<< "To: Mohd Naushad Ahmed <mahmed@sierrawireless.com>" << "\r\n"
        << "Subject: Test e-mail" << "\r\n"
        << "Date: " << std::asctime(std::localtime(&result)) << "\r\n\r\n"
        /// MIME Header end
@@ -651,9 +652,35 @@ std::uint32_t SMTP::QUIT::onResponse()
 
 std::uint32_t SMTP::QUIT::onResponse(std::string in, std::string& out, States& new_state)
 {
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::QUIT Terminating email session\n")));
-    auto ret = onCommand(in, out, new_state);
-    return(SMTP::status_code::END_EMAIL_TRANSACTION);
+    auto ent = getSmtpStatusCode(in);
+    auto retStatus = 0;
+
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::QUIT m_reply:%u m_statusCode:%s\n"), 
+              ent.m_reply, ent.m_statusCode.c_str()));
+
+    switch(ent.m_reply) {
+        case SMTP::reply_code::REPLY_CODE_250_Request_mail_action_okay_completed:
+            display(in);
+            if(!ent.m_statusCode.compare("2.0.0")) {
+                retStatus = onCommand(in, out, new_state);
+            }
+        break;
+        case SMTP::reply_code::REPLY_CODE_221_Service_closing_transmission_channel:
+            if(!ent.m_statusCode.compare("2.0.0")) {
+                ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::QUIT Closing the e-mailsession\n")));
+                return(SMTP::status_code::REMAIN_IN_SAME_STATE);
+            }
+        break;
+        case SMTP::reply_code::REPLY_CODE_220_Service_ready:
+            retStatus = onCommand(in, out, new_state);
+        break;
+        default:
+            display(in);
+            retStatus = onCommand(in, out, new_state);
+        break;
+
+    }
+    return(retStatus);
 }
 
 std::uint32_t SMTP::QUIT::onCommand(std::string in, std::string& out, States& new_state)
@@ -664,7 +691,7 @@ std::uint32_t SMTP::QUIT::onCommand(std::string in, std::string& out, States& ne
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
 
-    //new_state = INIT{};
+    return(SMTP::status_code::REMAIN_IN_SAME_STATE);
 
 }
 

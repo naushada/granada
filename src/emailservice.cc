@@ -167,7 +167,15 @@ ACE_INT32 SMTP::Client::handle_input(ACE_HANDLE handle)
     ss.clear();
     ret = user().tls()->read(ss);
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l received over tls length:%d response:%s\n"), ret, ss.c_str()));
-    user().rx(ss);
+    if(ret) {
+        user().rx(ss);
+    } else {
+        // closing the connection now.
+        m_mailServiceAvailable = false;
+        m_semaphore->acquire();
+        stop();
+        return(0);
+    }
   }
   
   /// @return upon success returns zero meaning middleware will continue the reactor loop else it breaks the loop
@@ -274,6 +282,7 @@ void SMTP::Client::main()
     while(m_mailServiceAvailable) ACE_Reactor::instance()->handle_events(to);
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l active object cease to exists\n")));
+    m_semaphore.release();
 }
 
 void SMTP::Client::stop()
@@ -311,7 +320,10 @@ std::int32_t SMTP::User::startEmailTransaction()
 std::int32_t SMTP::User::endEmailTransaction()
 {
   std::int32_t ret = 0;
-  m_client.reset(nullptr);
+  client()->m_mailServiceAvailable = false;
+  client()->m_semaphore->acquire();
+  //m_client.reset(nullptr);
+  m_client.release();
 
   return(ret);
 }
@@ -403,7 +415,7 @@ std::int32_t SMTP::User::rx(const std::string in)
                 case SMTP::status_code::CHALLENGE_FOR_PASSWORD_FAILED:
                 case SMTP::status_code::BASE64_DECODING_FAILED:
                 default:
-                    endEmailTransaction();
+                    //endEmailTransaction();
                 break;
 
             }
