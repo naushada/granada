@@ -319,6 +319,8 @@ std::int32_t SMTP::User::startEmailTransaction()
   /* upon connection establishment to smtp server, smtp server replies with greeting */
   fsm().set_state(GREETING());
   
+  /*block the control here */
+  while(client()->m_mailServiceAvailable) ;
   return(ret);
 }
 

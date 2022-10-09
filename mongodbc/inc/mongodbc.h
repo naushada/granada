@@ -71,7 +71,8 @@ class MongodbClient {
          */
         std::string get_access_token_for_ajoul(std::string json_obj);
         std::string get_tracking_no_for_ajoul(std::string json_obj, std::string& reference_no);
-        
+        std::uint32_t from_json_array_to_vector(const std::string json_obj, const std::string key, std::vector<std::string>& vec_out);
+        std::uint32_t from_json_element_to_string(const std::string json_obj, const std::string key, std::string& str_out);
 
     private:
         std::string mURI;

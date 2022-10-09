@@ -625,7 +625,9 @@ std::uint32_t SMTP::RCPT::onCommand(std::string in, std::string& out, States& ne
 {
 
     std::stringstream ss("");
-    ss << "RCPT TO: <naushad.dln@gmail.com>" << "\r\n";
+    for(const auto& elm : SMTP::Account::instance().to_email()) {
+        ss << "RCPT TO: <" << elm << ">\r\n";
+    }
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
     new_state = DATA{};

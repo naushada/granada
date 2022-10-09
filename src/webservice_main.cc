@@ -134,16 +134,14 @@ int main(int argc, char* argv[])
                   std::get<std::size_t(CommandArgumentName::DB_CONN_POOL)>(cmdOpt),
                   std::get<std::size_t(CommandArgumentName::DB_NAME)>(cmdOpt));
 
-    /* filling email for sending updateds */
-    //auto email_account = SMTP::Account::instance();
-    SMTP::Account::instance().from_name(std::get<std::size_t(CommandArgumentName::EMAIL_FROM_NAME)>(cmdOpt));
-    SMTP::Account::instance().from_email(std::get<std::size_t(CommandArgumentName::EMAIL_FROM_ID)>(cmdOpt));
-    SMTP::Account::instance().from_password(std::get<std::size_t(CommandArgumentName::EMAIL_FROM_PASSWORD)>(cmdOpt));
-    SMTP::Account::instance().email_subject("From HM Royal Testing");
-    SMTP::Account::instance().email_body("This an e-mail which is auto generated");
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l from_name:%s\n"), SMTP::Account::instance().from_name().c_str()));
-   SMTP::User email;
-   email.startEmailTransaction();
+   /* filling email for sending updateds */
+    
+   SMTP::Account::instance().from_name(std::get<std::size_t(CommandArgumentName::EMAIL_FROM_NAME)>(cmdOpt));
+   SMTP::Account::instance().from_email(std::get<std::size_t(CommandArgumentName::EMAIL_FROM_ID)>(cmdOpt));
+   SMTP::Account::instance().from_password(std::get<std::size_t(CommandArgumentName::EMAIL_FROM_PASSWORD)>(cmdOpt));
+   
+   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Master:%t] %M %N:%l from_name:%s\n"), SMTP::Account::instance().from_name().c_str()));
+
    inst.start();
 
    return(0);

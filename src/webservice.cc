@@ -3,6 +3,7 @@
 
 #include "webservice.h"
 #include "http_parser.h"
+#include "emailservice.hpp"
 
 std::string MicroService::handle_DELETE(std::string& in, MongodbClient& dbInst)
 {
@@ -428,6 +429,29 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 return(build_responseOK(rsp));
             }
         }
+    } else if(!uri.compare("/api/email/v1/send")) {
+        /* Send e-mail with POST request */
+        // {"subject": "", "to": [user-id@domain.com, user-id1@domain.com], "body": ""}
+        std::string json_body = http.body();
+        std::vector<std::string> out_vec;
+        std::string subj;
+        std::string body;
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email request:%s\n"), json_body.c_str()));
+        dbInst.from_json_array_to_vector(json_body, "to", out_vec);
+        dbInst.from_json_element_to_string(json_body, "subject", subj);
+        dbInst.from_json_element_to_string(json_body, "body", body);
+        for(const auto& elm: out_vec) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email to list:%s\n"), elm.c_str()));
+        }
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email subject:%s\n"), subj.c_str()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email body:%s\n"), body.c_str()));
+
+        SMTP::Account::instance().to_email(out_vec);
+        SMTP::Account::instance().email_subject(subj);
+        SMTP::Account::instance().email_body(body);
+        SMTP::User email;
+        email.startEmailTransaction();
+
     }
 
     return(build_responseOK(std::string()));

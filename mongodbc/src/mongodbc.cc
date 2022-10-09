@@ -780,6 +780,73 @@ std::string MongodbClient::get_tracking_no_for_ajoul(std::string json_obj, std::
   return(std::string());
 }
 
+std::uint32_t MongodbClient::from_json_array_to_vector(const std::string json_obj, const std::string key, std::vector<std::string>& vec_out)
+{
+  bsoncxx::document::value doc_val = bsoncxx::from_json(json_obj.c_str());
+  bsoncxx::document::view doc = doc_val.view();
+
+  auto it = doc.find(key);
+  if(it == doc.end()) {
+    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l the element:%s not found in the json document\n"), key.c_str()));
+    return(1);    
+  }
+
+  bsoncxx::document::element elm_value = *it;
+  if(elm_value && bsoncxx::type::k_array == elm_value.type()) {
+     bsoncxx::array::view to(elm_value.get_array().value);
+     for(bsoncxx::array::element elm : to) {
+        if(bsoncxx::type::k_utf8 == elm.type()) {
+            std::string tmp(elm.get_utf8().value.data(), elm.get_utf8().value.length());
+            vec_out.push_back(tmp);
+        }
+     }
+  } else {
+    vec_out.clear();
+  }
+  
+  return(0);
+
+#if 0
+  auto tt = it->get_document().value;
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the length is  %d value %s\n"), tt.length(), tt.data()));  
+  reference_no = tt["reference"].get_utf8().value.to_string();
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the reference is %s\n"), reference_no.c_str()));  
+
+  bsoncxx::document::element elm_value = doc["TrackingNumber"];
+
+  ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the type is %d\n"), elm_value.type()));
+  if(elm_value && elm_value.type() == bsoncxx::type::k_utf8) {
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the length is %d\n"), elm_value.get_utf8().value.length()));
+    std::string res(elm_value.get_utf8().value.data(), elm_value.get_utf8().value.length());
+    return(res);
+  }
+  return(std::string());
+  #endif
+}
+
+std::uint32_t MongodbClient::from_json_element_to_string(const std::string json_obj, const std::string key, std::string& str_out)
+{
+
+  bsoncxx::document::value doc_val = bsoncxx::from_json(json_obj.c_str());
+  bsoncxx::document::view doc = doc_val.view();
+
+  auto it = doc.find(key);
+  if(it == doc.end()) {
+    ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l The element:%s not found in json document\n"), key.c_str()));
+    return(1);    
+  }
+
+  bsoncxx::document::element elm_value = *it;
+  if(elm_value && bsoncxx::type::k_utf8 == elm_value.type()) {
+      std::string elm(elm_value.get_utf8().value.data(), elm_value.get_utf8().value.length());
+      str_out = elm;
+  } else {
+    str_out.clear();
+  }
+  
+  return(0);
+}
+
 #if 0
 std::string MongodbClient::get_tracking_no_for_ajoul(std::string json_obj, std::string& reference_no)
 {
