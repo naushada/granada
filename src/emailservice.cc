@@ -403,7 +403,7 @@ std::int32_t SMTP::User::rx(const std::string in)
                     len = m_tls->write(cmd);
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sent over tls length:%d command:%s\n"), len, cmd.c_str()));
                 } else {
-                    client()->tx(cmd);
+                    len = client()->tx(cmd);
                     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l sen tover plain tcp length:%d command:%s\n"), len, cmd.c_str()));
                 }
             }

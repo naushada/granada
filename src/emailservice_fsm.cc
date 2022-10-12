@@ -171,7 +171,7 @@ std::uint32_t SMTP::GREETING::onResponse(std::string in, std::string& out, State
             /* connection established successfully - send the next command */
             retStatus = onCommand(in, out, new_state);
             ACE_Time_Value to(1800,0);
-            parent.start_response_timeout_timer(to);
+            //parent.start_response_timeout_timer(to);
         }
         break;
         case SMTP::reply_code::REPLY_CODE_554_Transaction_has_failed:
@@ -353,7 +353,7 @@ std::uint32_t SMTP::MAIL::onCommand(std::string in, std::string& out, States& ne
 
     } else if(AUTH_SUCCESS == m_authStage) {
         if(!onLoginSuccess(in, out)) {
-          ss << "RESET" << "\r\n";
+          ss << "RSET" << "\r\n";
           out = ss.str();
           m_authStage = AUTH_INIT;
           new_state = RESET{};
@@ -386,7 +386,7 @@ std::uint32_t SMTP::MAIL::onUsername(const std::string in, std::string& base64Us
                 std::stringstream ss("");
                 ss << b64_;
                 base64Username = ss.str();
-                return(0);
+                return(SMTP::status_code::OK);
             }
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL challenge for username:%s\n"),usrName.c_str()));
             return(SMTP::status_code::CHALLENGE_FOR_USERNAME_FAILED);
@@ -414,7 +414,7 @@ std::uint32_t SMTP::MAIL::onPassword(const std::string in, std::string& base64Us
                 std::stringstream ss("");
                 ss << b64_;
                 base64Username = ss.str();
-                return(0);
+                return(SMTP::status_code::OK);
             }
             ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::MAIL challenge for username:%s\n"),pwd.c_str()));
             return(SMTP::status_code::CHALLENGE_FOR_PASSWORD_FAILED);
