@@ -297,8 +297,8 @@ void SMTP::Client::stop()
 SMTP::User::~User()
 {
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l entry_fn:%s \n"), __PRETTY_FUNCTION__));
-  m_client.reset(nullptr);
-  m_tls.reset(nullptr);
+  m_client.release();
+  m_tls.release();
   ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l dtor of User\n")));
 }
 
@@ -358,7 +358,7 @@ std::int32_t SMTP::User::rx(const std::string in)
                 m_tls->start(client()->get_handle());
             }
 
-            auto result = fsm().onRx(in, cmd, new_state);
+            auto result = fsm().onRx(in, cmd, new_state, *this);
             /// @brief  send the response for received request.
             if(cmd.length()) {
                 size_t len = -1;
@@ -395,7 +395,7 @@ std::int32_t SMTP::User::rx(const std::string in)
 
         default:
         {
-            auto result = fsm().onRx(in, cmd, new_state);
+            auto result = fsm().onRx(in, cmd, new_state, *this);
             /// @brief  send the response for received request.
             if(cmd.length()) {
                 size_t len = -1;
@@ -441,6 +441,26 @@ void SMTP::User::client(std::unique_ptr<SMTP::Client> smtpClient)
 const std::unique_ptr<SMTP::Client>& SMTP::User::client() const
 {
   return(m_client);
+}
+
+ACE_INT32 SMTP::User::handle_timeout(const ACE_Time_Value& tv, const void* act)
+{
+    return(0);
+}
+
+SMTP::User& SMTP::User::start_response_timeout_timer(ACE_Time_Value &to)
+{
+    m_response_timer = ACE_Reactor::instance()->schedule_timer(this, (const void *)nullptr, to);
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l Command response timeout timer is started successfully\n")));
+    return(*this);
+}
+
+SMTP::User& SMTP::User::stop_response_timeout_timer()
+{
+    if(ACE_Reactor::instance()->cancel_timer(m_response_timer)) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [emailservice:%t] %M %N:%l Command response timeout timer is stopped successfully\n")));
+    }
+    return(*this);
 }
 
 #endif /* __emailservice_cc__ */

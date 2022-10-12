@@ -159,16 +159,20 @@ std::uint32_t SMTP::GREETING::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::GREETING::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::GREETING::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
     auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
 
     switch(ent.m_reply) {
         case SMTP::reply_code::REPLY_CODE_220_Service_ready:
+        {
             display(in); 
             /* connection established successfully - send the next command */
             retStatus = onCommand(in, out, new_state);
+            ACE_Time_Value to(1800,0);
+            parent.start_response_timeout_timer(to);
+        }
         break;
         case SMTP::reply_code::REPLY_CODE_554_Transaction_has_failed:
         break;
@@ -219,7 +223,7 @@ std::uint32_t SMTP::HELO::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::HELO::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::HELO::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
     auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
@@ -291,7 +295,7 @@ std::uint32_t SMTP::MAIL::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::MAIL::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::MAIL::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
     auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
@@ -458,7 +462,7 @@ std::uint32_t SMTP::DATA::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::DATA::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::DATA::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
     auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
@@ -517,7 +521,7 @@ std::uint32_t SMTP::BODY::onResponse()
 {
     return(0);
 }
-std::uint32_t SMTP::BODY::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::BODY::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
     auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
@@ -594,7 +598,7 @@ std::uint32_t SMTP::RCPT::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::RCPT::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::RCPT::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
     auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
@@ -656,7 +660,7 @@ std::uint32_t SMTP::QUIT::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::QUIT::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::QUIT::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
     auto ent = getSmtpStatusCode(in);
     auto retStatus = 0;
@@ -723,7 +727,7 @@ std::uint32_t SMTP::RESET::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::RESET::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::RESET::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
 
 }
@@ -756,7 +760,7 @@ std::uint32_t SMTP::VRFY::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::VRFY::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::VRFY::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
 
 }
@@ -790,7 +794,7 @@ std::uint32_t SMTP::NOOP::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::NOOP::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::NOOP::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
 
 }
@@ -822,7 +826,7 @@ std::uint32_t SMTP::EXPN::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::EXPN::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::EXPN::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
 
 }
@@ -854,7 +858,7 @@ std::uint32_t SMTP::HELP::onResponse()
     return(0);
 }
 
-std::uint32_t SMTP::HELP::onResponse(std::string in, std::string& out, States& new_state)
+std::uint32_t SMTP::HELP::onResponse(std::string in, std::string& out, States& new_state, User& parent)
 {
     auto ent = SMTP::getSmtpStatusCode(in);
     switch(ent.m_reply) {
