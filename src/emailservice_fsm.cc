@@ -148,6 +148,19 @@ std::string SMTP::getContentType(std::string ext)
         return("application/zip");
     } else if(!ext.compare("gzip")) {
         return("application/x-gzip");
+    } else if(!ext.compare("xls") || !ext.compare("xlsx")) {
+        return("application/vnd.ms-excel");
+    } else if(!ext.compare("pps") || !ext.compare("ppt") || !ext.compare("pptx")) {
+        return("application/vnd.ms-powerpoint");
+    } else if(!ext.compare("jpeg") || !ext.compare("jpg") || !ext.compare("jpe")) {
+        return("image/jpeg");
+    } else if(!ext.compare("mpeg") || !ext.compare("mpg") || !ext.compare("mpe")) {
+        return("video/mpeg");
+    } else if(!ext.compare("gif")) {
+        return("image/gif");
+    } else if(!ext.compare("asc") || !ext.compare("diff") || !ext.compare("c") || !ext.compare("log") || 
+              !ext.compare("patch") || !ext.compare("pot") || !ext.compare("text") || !ext.compare("txt")) {
+        return("text/plain");
     }
 }
 
@@ -560,9 +573,17 @@ std::uint32_t SMTP::BODY::onResponse(std::string in, std::string& out, States& n
     }
     return(retStatus);
 }
+
+/**
+ * @brief 
+ * 
+ * @param in 
+ * @param out 
+ * @param new_state 
+ * @return std::uint32_t 
+ */
 std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& new_state)
 {
-
     std::stringstream ss("");
     std::time_t result = std::time(nullptr);
     /// MIME Header
