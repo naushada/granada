@@ -571,50 +571,70 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
        << "From: "<<  Account::instance().from_name() << " <" << Account::instance().from_email() << ">\r\n"
        << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
        << "Subject: " << Account::instance().email_subject() <<"\r\n"
-       << "Date: " << std::asctime(std::localtime(&result))
-       << "Content-Type: multipart/mixed; boundary=frontier" << "\r\n"
-       << "--frontier\r\n"
-       << "Content-type: text/plain; charset=us-ascii" << "\r\n\r\n"
-       << Account::instance().email_body() << "\r\n";
-       /// email body ends with dot
-       //<<"\r\n"<< "." <<"\r\n";
-    
+       //asctime is appending the \n line character, so don't need to add explicitly.
+       << "Date: " << std::asctime(std::localtime(&result));
+
     auto list = Account::instance().attachment();
-    for(auto it = list.begin(); it != list.end(); ++it) {
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY file_name:%s content:%s\n"), 
-              std::get<0>(*it).c_str(), std::get<1>(*it).c_str()));
-        
-        auto fname = std::get<0>(*it);
-        std::size_t pos = fname.find(".");
-
-        
-        /* open the file*/
-        std::ifstream ifs(fname);
-        if(!ifs.is_open()) {
-            /* Fileopen failed */
-            
-        } else {
-            std::stringstream contents;
-            std::string b64_;
-
-            contents << ifs.rdbuf();
-            auto len = SMTP::getBase64(contents.str(),b64_);
-            auto type = SMTP::getContentType(fname.substr(pos + 1 /* to skip dot itself */));
-
-            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY ifs_len:%u file-type:%s len:%u b64:%s\n"), 
-            //  contents.str().length(), type.c_str(), len, b64_.c_str()));
-            ss << "--frontier\r\n"
-               << "Content-Transfer-Encoding: base64\r\n"
-               << "Content-Type: " << type << "\r\n"
-               << "Content-Disposition: attachment; filename=" << "PWI_264_Jul.pdf" << " ;size-parm=" << contents.str().length() << "\r\n\r\n"
-               
-               << b64_ << "\r\n"
-               << "--frontier--\r\n"
-               <<"\r\n"<< "." <<"\r\n";
-            ifs.close();
-        }
+    if(list.empty()) {
+        ss << "Content-type: text/plain; charset=us-ascii" << "\r\n\r\n"
+           << Account::instance().email_body() << "\r\n";
+    } else {
+        ss << "Content-Type: multipart/mixed; boundary=cordoba" << "\r\n"
+           << "--cordoba\r\n"
+           << "Content-type: text/plain; charset=us-ascii" << "\r\n\r\n"
+           << Account::instance().email_body() << "\r\n";
     }
 
+    for(auto it = list.begin(); it != list.end(); ++it) {
+        auto fname = std::get<0>(*it);
+        do {
+            if(fname.empty()) {
+                ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY file_name:empty\n")));
+                break;
+            }
+
+            std::size_t pos = fname.find(".");
+            /* open the file*/
+            std::ifstream ifs(fname);
+            if(!ifs.is_open()) {
+                /* Fileopen failed */
+                ACE_ERROR((LM_ERROR, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY file_name:%s is not known to server\n"), fname.c_str()));
+                std::string file_content("");
+
+                file_content = std::get<1>(*it);
+                if(!file_content.empty()) {
+                    auto type = SMTP::getContentType(fname.substr(pos + 1 /* to skip dot itself */));
+
+                    ss << "--cordoba\r\n"
+                       << "Content-Transfer-Encoding: base64\r\n"
+                       << "Content-Type: " << type << "\r\n"
+                       << "Content-Disposition: attachment; filename=" << fname << " ;size-parm=" << file_content.length() << "\r\n\r\n"
+                       << file_content << "\r\n";    
+                }
+                break;
+            } else {
+                std::stringstream contents;
+                std::string b64_;
+
+                contents << ifs.rdbuf();
+                auto len = SMTP::getBase64(contents.str(),b64_);
+                auto type = SMTP::getContentType(fname.substr(pos + 1 /* to skip dot itself */));
+
+                ss << "--cordoba\r\n"
+                   << "Content-Transfer-Encoding: base64\r\n"
+                   << "Content-Type: " << type << "\r\n"
+                   << "Content-Disposition: attachment; filename=" << fname << " ;size-parm=" << contents.str().length() << "\r\n\r\n"
+                   << b64_ << "\r\n";
+                ifs.close();
+            }
+        } while(0);
+    }
+
+    if(!list.empty()) {
+        ss << "--cordoba--\r\n";
+    }
+    /// email body ends with dot
+    ss <<"\r\n"<< "." <<"\r\n";
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
  
