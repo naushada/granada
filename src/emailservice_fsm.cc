@@ -138,6 +138,19 @@ void SMTP::display(std::string in)
     }
 }
 
+std::string SMTP::getContentType(std::string ext)
+{
+    if(!ext.compare("pdf")) {
+        return("application/pdf");
+    } else if(!ext.compare("docx") || !ext.compare("doc")) {
+        return("application/msword");
+    } else if(!ext.compare("zip")) {
+        return("application/zip");
+    } else if(!ext.compare("gzip")) {
+        return("application/x-gzip");
+    }
+}
+
 void SMTP::GREETING::onEntry()
 {
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::GREETING function:%s\n"), __PRETTY_FUNCTION__));
@@ -555,20 +568,47 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
     /// MIME Header
     ss << "MIME-Version: 1.0" << "\r\n"
        << "Content-type: text/plain; charset=us-ascii" << "\r\n"
-       //<< "From: HM Royal <hnm.royal@gmail.com>" << "\r\n"
        << "From: "<<  Account::instance().from_name() << " <" << Account::instance().from_email() << ">\r\n"
        << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
-       //<< "To: " << Account::instance().
-       //<< "To: Mohd Naushad Ahmed <mahmed@sierrawireless.com>" << "\r\n"
        << "Subject: " << Account::instance().email_subject() <<"\r\n"
-       << "Date: " << std::asctime(std::localtime(&result)) << "\r\n\r\n"
-       /// MIME Header end
-       //<< "This is from SMTP Client\r\n" 
-       << Account::instance().email_body() << "\r\n"
+       << "Date: " << std::asctime(std::localtime(&result)) << "\r\n";
+       
+    
+    auto list = Account::instance().attachment();
+    for(auto it = list.begin(); it != list.end(); ++it) {
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY file_name:%s content:%s\n"), 
+              std::get<0>(*it).c_str(), std::get<1>(*it).c_str()));
+        
+        auto fname = std::get<0>(*it);
+        std::size_t pos = fname.find(".");
+
+        
+        /* open the file*/
+        std::ifstream ifs(fname);
+        if(!ifs.is_open()) {
+            /* Fileopen failed */
+            
+        } else {
+            std::stringstream contents;
+            std::string b64_;
+
+            contents << ifs.rdbuf();
+            auto len = SMTP::getBase64(contents.str(),b64_);
+            auto type = SMTP::getContentType(fname.substr(pos + 1 /* to skip dot itself */));
+
+            //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY ifs_len:%u file-type:%s len:%u b64:%s\n"), 
+            //  contents.str().length(), type.c_str(), len, b64_.c_str()));
+
+            ss << "Content-Type: " << type << "\r\n"
+               << "Content-Disposition: attachment; filename=" << fname << "\r\n\r\n"
+               << b64_ <<"\r\n";
+            ifs.close();
+        }
+    }
+
+    ss << Account::instance().email_body() << "\r\n"
        /// email body ends with dot
        <<"\r\n"<< "." <<"\r\n";
-    
-
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
  
@@ -607,8 +647,12 @@ std::uint32_t SMTP::RCPT::onResponse(std::string in, std::string& out, States& n
 
     switch(ent.m_reply) {
         case SMTP::reply_code::REPLY_CODE_250_Request_mail_action_okay_completed:
-            display(in);
-            retStatus = onCommand(in, out, new_state);
+        {
+            if(!ent.m_statusCode.compare("2.1.0")) {
+                display(in);
+                retStatus = onCommand(in, out, new_state);
+            }
+        }
         break;
         case SMTP::reply_code::REPLY_CODE_535_5_7_8_Authentication_credentials_invalid:
         

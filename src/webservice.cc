@@ -434,12 +434,15 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
         // {"subject": "", "to": [user-id@domain.com, user-id1@domain.com], "body": ""}
         std::string json_body = http.body();
         std::vector<std::string> out_vec;
+        std::vector<std::tuple<std::string, std::string>> out_list;
         std::string subj;
         std::string body;
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email request:%s\n"), json_body.c_str()));
         dbInst.from_json_array_to_vector(json_body, "to", out_vec);
         dbInst.from_json_element_to_string(json_body, "subject", subj);
         dbInst.from_json_element_to_string(json_body, "body", body);
+        dbInst.from_json_object_to_map(json_body, "files", out_list);
+
         for(const auto& elm: out_vec) {
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email to list:%s\n"), elm.c_str()));
         }
@@ -449,6 +452,12 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
         SMTP::Account::instance().to_email(out_vec);
         SMTP::Account::instance().email_subject(subj);
         SMTP::Account::instance().email_body(body);
+
+        if(!out_list.empty()) {
+            /* e-mail with attachment */
+            SMTP::Account::instance().attachment(out_list);
+        }
+
         SMTP::User email;
         email.startEmailTransaction();
 

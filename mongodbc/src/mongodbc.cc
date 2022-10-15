@@ -847,6 +847,47 @@ std::uint32_t MongodbClient::from_json_element_to_string(const std::string json_
   return(0);
 }
 
+std::uint32_t MongodbClient::from_json_object_to_map(const std::string json_obj, const std::string key, std::vector<std::tuple<std::string, std::string>>& out)
+{
+    bsoncxx::document::value doc_val = bsoncxx::from_json(json_obj.c_str());
+    bsoncxx::document::view doc = doc_val.view();
+
+    auto it = doc.find(key);
+    if(it == doc.end()) {
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l the element:%s not found in the json document\n"), key.c_str()));
+        return(1);    
+    }
+
+    bsoncxx::document::element elm_value = *it;
+    if(elm_value && bsoncxx::type::k_array == elm_value.type()) {
+       bsoncxx::array::view to(elm_value.get_array().value);
+       for(bsoncxx::array::element elm : to) {
+          if(bsoncxx::type::k_document == elm.type()) {
+              /* get the document now */
+              auto doc = elm.get_document().value;
+              ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l file-name:%s file-content:%s\n"), doc["file-name"].get_utf8().value.data(), 
+                         doc["file-content"].get_utf8().value.data()));
+              #if 0
+              for(auto it = doc.begin(); it != doc.end(); ++it) {
+                  out.push_back(std::make_tuple(doc["file-name"].get_utf8().value.data(), doc["file-content"].get_utf8().value.data()));
+              }
+              #endif
+              out.push_back(std::make_tuple(doc["file-name"].get_utf8().value.data(), doc["file-content"].get_utf8().value.data()));
+          }
+          #if 0
+          if(bsoncxx::type::k_utf8 == elm.type()) {
+              std::string tmp(elm.get_utf8().value.data(), elm.get_utf8().value.length());
+              vec_out.push_back(tmp);
+          }
+          #endif
+       }
+    } else {
+        out.clear();
+    }
+  
+    return(0);
+}
+
 #if 0
 std::string MongodbClient::get_tracking_no_for_ajoul(std::string json_obj, std::string& reference_no)
 {

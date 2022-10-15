@@ -8,6 +8,9 @@
 #include <type_traits>
 #include <optional>
 #include <cassert>
+#include <iostream>
+#include <fstream>
+
 /*
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
@@ -69,6 +72,7 @@ namespace SMTP {
   std::uint32_t getBase64(const std::string in, std::string& b64Out);
   auto find(const std::string in, std::string what);
   void display(std::string in);
+  std::string getContentType(std::string ext);
 
   enum reply_code: std::uint32_t {
     REPLY_CODE_214_Response_to_HELP = 214,
@@ -508,6 +512,15 @@ namespace SMTP {
         return(m_email_subject);
       }
 
+      Account& attachment(std::vector<std::tuple<std::string, std::string>> in) {
+        m_attachment = in;
+        return(*this);
+      }
+
+      std::vector<std::tuple<std::string, std::string>>& attachment() {
+        return(m_attachment);
+      }
+
     private:
 
       Account() {
@@ -525,6 +538,7 @@ namespace SMTP {
       std::vector<std::string> m_to_email;
       std::string m_email_subject;
       std::string m_email_body;
+      std::vector<std::tuple<std::string, std::string>> m_attachment;
   };
 
   class User : public ACE_Event_Handler {
