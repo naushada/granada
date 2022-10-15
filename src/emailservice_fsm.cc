@@ -567,12 +567,17 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
     std::time_t result = std::time(nullptr);
     /// MIME Header
     ss << "MIME-Version: 1.0" << "\r\n"
-       << "Content-type: text/plain; charset=us-ascii" << "\r\n"
+       //<< "Content-type: text/plain; charset=us-ascii" << "\r\n"
        << "From: "<<  Account::instance().from_name() << " <" << Account::instance().from_email() << ">\r\n"
        << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
        << "Subject: " << Account::instance().email_subject() <<"\r\n"
-       << "Date: " << std::asctime(std::localtime(&result)) << "\r\n";
-       
+       << "Date: " << std::asctime(std::localtime(&result))
+       << "Content-Type: multipart/mixed; boundary=frontier" << "\r\n"
+       << "--frontier\r\n"
+       << "Content-type: text/plain; charset=us-ascii" << "\r\n\r\n"
+       << Account::instance().email_body() << "\r\n";
+       /// email body ends with dot
+       //<<"\r\n"<< "." <<"\r\n";
     
     auto list = Account::instance().attachment();
     for(auto it = list.begin(); it != list.end(); ++it) {
@@ -598,17 +603,18 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
 
             //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [mailservice:%t] %M %N:%l ST::BODY ifs_len:%u file-type:%s len:%u b64:%s\n"), 
             //  contents.str().length(), type.c_str(), len, b64_.c_str()));
-
-            ss << "Content-Type: " << type << "\r\n"
-               << "Content-Disposition: attachment; filename=" << fname << "\r\n\r\n"
-               << b64_ <<"\r\n";
+            ss << "--frontier\r\n"
+               << "Content-Transfer-Encoding: base64\r\n"
+               << "Content-Type: " << type << "\r\n"
+               << "Content-Disposition: attachment; filename=" << "PWI_264_Jul.pdf" << " ;size-parm=" << contents.str().length() << "\r\n\r\n"
+               
+               << b64_ << "\r\n"
+               << "--frontier--\r\n"
+               <<"\r\n"<< "." <<"\r\n";
             ifs.close();
         }
     }
 
-    ss << Account::instance().email_body() << "\r\n"
-       /// email body ends with dot
-       <<"\r\n"<< "." <<"\r\n";
     /// @brief modifiying out with response message to be sent to smtp server 
     out = ss.str();
  
