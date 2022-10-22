@@ -833,6 +833,7 @@ std::uint32_t MongodbClient::from_json_element_to_string(const std::string json_
   auto it = doc.find(key);
   if(it == doc.end()) {
     ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l The element:%s not found in json document\n"), key.c_str()));
+    str_out.clear();
     return(1);    
   }
 

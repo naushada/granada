@@ -461,6 +461,32 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
         SMTP::User email;
         email.startEmailTransaction();
 
+    } else if(!uri.compare("/api/v1/document/upload")) {
+        std::string content = http.body();
+        std::string coll("attachment");
+
+        if(content.length()) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
+            std::string value("");
+            auto result = dbInst.from_json_element_to_string(content, "corporate", value);
+
+            if(!result) {
+                coll.clear();
+                coll = value + "_attachment";
+            }
+
+            std::string record = dbInst.create_document(coll, content);
+
+            if(record.length()) {
+                std::string rsp("");
+                rsp = "{\"oid\" : \"" + record + "\"}";
+                return(build_responseOK(rsp));
+            } else {
+                std::string err("400 Bad Request");
+                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"attachment upload failed\", \"errorCode\" : 400}");
+                return(build_responseERROR(err_message, err));
+            }
+        }
     }
 
     return(build_responseOK(std::string()));
@@ -910,6 +936,53 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l No Record is found \n")));
             return(build_responseERROR(err_message, err));
         }
+    } else if(!uri.compare("/api/v1/document/attachment")) {
+        //Getting the list of attach document
+        std::stringstream criteria("");
+        auto collection = http.get_element("corporate");
+        auto userId = http.get_element("userId");
+
+        if(userId.length()) {
+            criteria << "{\"corporate\": \"" 
+                     << collection 
+                     << "\", \"userId\" : \""  
+                     << userId 
+                     << "\"}"; 
+        } else {
+            criteria << "{\"corporate\" : \""  
+                     << collection 
+                     << "\"}"; 
+        }
+
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_documents(collection, criteria.str(), projection);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l attachment Querying for criteria %s\n"), criteria.str().c_str()));
+
+    } else if(!uri.compare("/api/v1/attachment/download")) {
+        //Getting the contents of attachment
+        std::stringstream criteria("");
+        std::string collection = http.get_element("corporate");
+        std::string userId = http.get_element("userId");
+        auto fileName = http.get_element("file");
+
+        if(userId.length() > 0) {
+            criteria << "{\"corporate\": \"" 
+                     << collection 
+                     << "\", \"userId\": \"" 
+                     << userId 
+                     << "\", \"file\":\"" 
+                     << fileName 
+                     << "\"}"; 
+        } else {
+            criteria << "{\"corporate\" : \""  
+                     << collection
+                     << "\"}"; 
+        }
+
+        std::string projection("{\"_id\" : false}");
+        std::string record = dbInst.get_documents(collection, criteria.str(), projection);
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l attachment Querying for criteria %s\n"), criteria.str().c_str()));
+
     } else if((!uri.compare(0, 7, "/webui/"))) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
         /* build the file name now */
