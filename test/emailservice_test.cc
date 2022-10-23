@@ -14,11 +14,14 @@ void EmailServiceTest::SetUp()
     ACE_UNUSED_ARG(_dbName);
 
     mMongodbc = std::make_unique<MongodbClient>(uri);
+    mUser = std::make_unique<SMTP::User>();
+
 }
 
 void EmailServiceTest::TearDown()
 {
     mMongodbc.release();
+    mUser.release();
 }
 
 void EmailServiceTest::TestBody()
@@ -57,17 +60,29 @@ EmailServiceTest::EmailServiceTest(std::string in)
         /* e-mail with attachment */
         SMTP::Account::instance().attachment(out_list);
     }
-
-    SMTP::User email;
-    email.startEmailTransaction();
-
 }
 
 // Demonstrate some basic assertions.
 TEST(Test1, BasicAssertions) {
   std::stringstream ss("");
-  ss << "{\"subject\": \"Test email client\",\"to\": [\"naushad.dln@gmail.com\", \"hnm.royal@gmail.com\", \"dream.avenue.gp@gmail.com\"], \"body\": \"abcd\", \"files\": [{\"file-name\": \"/home/mnahmed/PWI_264_Jul.pdf\", \"file-content\":\"testing\"}]}";
+  ss << "{\"subject\": \"Test email client\", "
+     << "\"to\": [\"naushad.dln@gmail.com\", \"hnm.royal@gmail.com\", \"dream.avenue.gp@gmail.com\"],"
+     << "\"body\": \"abcd\","
+     << "\"files\": [{\"file-name\": \"/home/mnahmed/PWI_264_Jul.pdf\", \"file-content\":\"testing\"}]"
+     << "}";
+  std::stringstream response("");
+  response << "250-smtp.gmail.com at your service, [45.252.71.217]\r\n"
+           << "250-SIZE 35882577\r\n"
+           << "250-8BITMIME\r\n"
+           << "250-STARTTLS\r\n"
+           << "250-ENHANCEDSTATUSCODES\r\n"
+           << "250-PIPELINING\r\n"
+           << "250-CHUNKING\r\n"
+           << "250 SMTPUTF8\r\n";
+   
   EmailServiceTest emailTest(ss.str());
+  emailTest.mUser->fsm().set_state(SMTP::GREETING());
+  emailTest.mUser->rx(response.str());
   // Expect two strings not to be equal.
   EXPECT_STRNE("hello", "world");
   // Expect equality.

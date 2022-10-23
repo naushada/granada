@@ -19,12 +19,13 @@ class EmailServiceTest : public ::testing::Test
     public:
         EmailServiceTest(std::string in);
         ~EmailServiceTest() = default;
-
+     
         virtual void SetUp() override;
         virtual void TearDown() override;
         virtual void TestBody() override;
-    private:
+
         std::unique_ptr<MongodbClient> mMongodbc; 
+        std::unique_ptr<SMTP::User> mUser;
 
 };
 
