@@ -2,7 +2,30 @@
 #define __emailservice_test_hpp__
 
 #include <gtest/gtest.h>
-#include "emailservice.hpp"
+#include <vector>
+#include <memory>
+#include <unordered_map>
+#include <algorithm>
+#include <iostream>
+#include <fstream>
 
+#include "emailservice.hpp"
+#include "mongodbc.h"
+#include "webservice.h"
+#include "http_parser.h"
+
+class EmailServiceTest : public ::testing::Test
+{
+    public:
+        EmailServiceTest(std::string in);
+        ~EmailServiceTest() = default;
+
+        virtual void SetUp() override;
+        virtual void TearDown() override;
+        virtual void TestBody() override;
+    private:
+        std::unique_ptr<MongodbClient> mMongodbc; 
+
+};
 
 #endif /*__emailservice_test_hpp__*/
