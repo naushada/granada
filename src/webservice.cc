@@ -429,7 +429,7 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 return(build_responseOK(rsp));
             }
         }
-    } else if(!uri.compare("/api/email/v1/send")) {
+    } else if(!uri.compare("/api/v1/email/send")) {
         /* Send e-mail with POST request */
         // {"subject": "", "to": [user-id@domain.com, user-id1@domain.com], "body": ""}
         std::string json_body = http.body();
@@ -486,6 +486,18 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"attachment upload failed\", \"errorCode\" : 400}");
                 return(build_responseERROR(err_message, err));
             }
+        }
+    } else if(!uri.compare("/api/v1/db/config")) {
+        std::string content = http.body();
+        
+        if(content.length()) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
+            std::string ip_address("");
+            auto result = dbInst.from_json_element_to_string(content, "ip_address", ip_address);
+            std::string port("");
+            result = dbInst.from_json_element_to_string(content, "port", port);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l dbconfig ip:%s port:%u\n"), ip_address.c_str(), std::stoul(port)));
+            /* Apply this config if changed */
         }
     }
 
