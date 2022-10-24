@@ -281,19 +281,27 @@ std::string MongodbClient::get_documents(std::string collectionName, std::string
     return(std::string(result.str()));
 }
 
-std::string MongodbClient::create_document(std::string collectionName, std::string doc)
+/**
+ * @brief this member function insert singlr document in a collection and returns the inserted OID
+ * 
+ * @param dbName 
+ * @param collectionName 
+ * @param doc 
+ * @return std::string 
+ */
+std::string MongodbClient::create_document(std::string dbName, std::string collectionName, std::string doc)
 {
     bsoncxx::document::value document = bsoncxx::from_json(doc.c_str());
     
     auto conn = mMongoConnPool->acquire();
     if(!conn) {
-        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection:%s\n"), collectionName.c_str()));
         return(std::string());
     }
 
-    mongocxx::database dbInst = conn->database(get_database().c_str());
+    mongocxx::database dbInst = conn->database(dbName.c_str());
     if(!dbInst) {
-        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse %s\n"), collectionName.c_str()));
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for databse:%s\n"), dbName.c_str()));
         return(std::string());
     }
 
@@ -303,7 +311,7 @@ std::string MongodbClient::create_document(std::string collectionName, std::stri
     if(result) {
         bsoncxx::oid oid = result->inserted_id().get_oid().value;
         std::string JobID = oid.to_string();
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid is %s\n"), JobID.c_str()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [Worker:%t] %M %N:%l The inserted Oid:%s\n"), JobID.c_str()));
         return(JobID);
     }
 
@@ -381,7 +389,14 @@ std::string MongodbClient::get_documentList(std::string collectionName, std::str
     return(std::string(result.str()));
 }
 
-std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std::string doc)
+/**
+ * @brief This member function insert the multiple documents in a collection for a given uri.
+ * 
+ * @param collectionName 
+ * @param doc 
+ * @return std::int32_t 
+ */
+std::int32_t MongodbClient::create_bulk_document(std::string dbName, std::string collectionName, std::string doc)
 {
     std::int32_t cnt = 0;
     mongocxx::options::bulk_write bulk_opt;
@@ -393,13 +408,13 @@ std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std
     bsoncxx::document::value new_shipment = bsoncxx::from_json(doc.c_str());
     auto conn = mMongoConnPool->acquire();
     if(!conn) {
-        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection %s\n"), collectionName.c_str()));
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for collection:%s\n"), collectionName.c_str()));
         return(cnt);
     }
 
-    mongocxx::database dbInst = conn->database(get_database().c_str());
+    mongocxx::database dbInst = conn->database(dbName.c_str());
     if(!dbInst) {
-        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for database %s\n"), collectionName.c_str()));
+        ACE_ERROR((LM_ERROR, ACE_TEXT("%D [Worker:%t] %M %N:%l acquiring DB client failed for database:%s\n"), dbName.c_str()));
         return(cnt);
     }
 
@@ -420,7 +435,7 @@ std::int32_t MongodbClient::create_bulk_document(std::string collectionName, std
 
     if(result) {
         cnt = result->inserted_count();
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l bulk document created is %d\n"), cnt));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l bulk document created cnt:%d\n"), cnt));
     }
 
     return(cnt);

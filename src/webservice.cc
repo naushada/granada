@@ -5,6 +5,13 @@
 #include "http_parser.h"
 #include "emailservice.hpp"
 
+/**
+ * @brief This member function processes the DELETE for a given uri.
+ * 
+ * @param in http request with MIME header
+ * @param dbInst instance of mongodb driver
+ * @return std::string 
+ */
 std::string MicroService::handle_DELETE(std::string& in, MongodbClient& dbInst)
 {
     Http http(in);
@@ -13,13 +20,14 @@ std::string MicroService::handle_DELETE(std::string& in, MongodbClient& dbInst)
     std::string uri(http.get_uriName());
     std::string document("");
 
-    if(!uri.compare("/api/deleteAwbList")) {
+    if(!uri.compare("/api/v1/shipment/awblist")) {
         /** Delete Shipment */
         std::string coll("shipping");
         std::string awbNo = http.get_element("awbList");
         std::string startDate = http.get_element("startDate");
         std::string endDate = http.get_element("endDate");
         if(awbNo.length()) {
+            // awbList contains value with comma seperated and converting into an array 
             std::string lst("[");
             std::string delim = ",";
             auto start = 0U;
@@ -36,7 +44,7 @@ std::string MicroService::handle_DELETE(std::string& in, MongodbClient& dbInst)
             document = "{\"shipmentNo\": {\"$in\" : " + lst + "}}";
 
         } else if(startDate.length() && endDate.length()) {
-
+            // deleting awb based on start & end date - bulk delete
             document = "{\"createdOn\": {\"$gte\" : \"" + startDate + "\"," + "\"$lte\" :\"" + endDate +"\"" +"}}";
         } else {
 
@@ -103,32 +111,48 @@ std::int32_t MicroService::process_request(ACE_HANDLE handle, ACE_Message_Block&
     return(ret);
 }
 
+/**
+ * @brief This member function starts processing the incoming HTTP request and based on HTTP method it calls 
+ *        respective member function.
+ *
+ * @param handle socker descriptor on which HTTP request is received 
+ * @param req HTTP request with MIME header
+ * @param dbInst An instance of mongodb driver
+ * @return std::int32_t 
+ */
 std::int32_t MicroService::process_request(ACE_HANDLE handle, std::string& req, MongodbClient& dbInst)
 {
-    std::string http_header, http_body;
-    http_header.clear();
-    http_body.clear();
-    std::string rsp;
-
-    //std::string req(mb.rd_ptr(), mb.length());
+    std::string rsp("");
+    std::int32_t ret = 0;
 
     if(std::string::npos != req.find("OPTIONS", 0)) {
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l OPTIONS request:%s\n"), req.c_str()));
       rsp = handle_OPTIONS(req);
+
     } else if(std::string::npos != req.find("GET", 0)) {
-      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l REQ %s\n"), req.c_str()));
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l GET request:%s\n"), req.c_str()));
       rsp = handle_GET(req, dbInst); 
+
     } else if(std::string::npos != req.find("POST", 0)) {
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l POST request:%s\n"), req.c_str()));
       rsp = handle_POST(req, dbInst);
+
     } else if(std::string::npos != req.find("PUT", 0)) {
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l PUT request:%s\n"), req.c_str()));
       rsp = handle_PUT(req, dbInst);
+
     } else if(std::string::npos != req.find("DELETE", 0)) {
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l DELETE request:%s\n"), req.c_str()));
       rsp = handle_DELETE(req, dbInst);  
+
     } else {
+      ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Method is not supported request:%s\n"), req.c_str()));
       /* Not supported Method */
+      return(ret);
+
     }
 
-    std::int32_t ret = 0;
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the response length is %d\n"), rsp.length()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l the response length:%d\n"), rsp.length()));
     
     std::int32_t  toBeSent = rsp.length();
     std::int32_t offset = 0;
@@ -187,6 +211,13 @@ std::string MicroService::get_contentType(std::string ext)
     return(cntType);
 }
 
+/**
+ * @brief This member function is used to create document in a collection for a given uri.
+ * 
+ * @param in 
+ * @param dbInst 
+ * @return std::string 
+ */
 std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
 {
     /* Check for Query string */
@@ -194,44 +225,88 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
-    if(!uri.compare("/api/shipping")) {
+    if(!uri.compare(0, 16, "/api/v1/shipment")) {
+        return(handle_shipment_POST(in, dbInst));
+
+    } else if(!uri.compare(0, 14, "/api/v1/config")) {
+        return(handle_config_POST(in, dbInst));
+
+    } else if(!uri.compare(0, 15, "/api/v1/account")) {
+        return(handle_account_POST(in, dbInst));
+
+    } else if(!uri.compare(0, 17, "/api/v1/inventory")) {
+        return(handle_inventory_POST(in, dbInst));
+
+    } else if(!uri.compare(0, 16, "/api/v1/document")) {
+        return(handle_document_POST(in, dbInst));
+
+    } else if(!uri.compare(0, 13, "/api/v1/email")) {
+        return(handle_email_POST(in, dbInst));
+
+    } else {
+        return(build_responseOK(std::string()));
+
+    }
+}
+
+std::string MicroService::handle_config_POST(std::string& in, MongodbClient& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/v1/config/db")) {
+        std::string content = http.body();
+        
+        if(content.length()) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
+            std::string ip_address("");
+            auto result = dbInst.from_json_element_to_string(content, "ip_address", ip_address);
+            std::string port("");
+            result = dbInst.from_json_element_to_string(content, "port", port);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l dbconfig ip:%s port:%u\n"), ip_address.c_str(), std::stoul(port)));
+            /* Apply this config if changed */
+        }
+    }
+    
+    return(std::string());
+}
+
+std::string MicroService::handle_shipment_POST(std::string& in, MongodbClient& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/v1/shipment/single/shipping")) {
         std::string collectionName("shipping");
+
         /*We need newly shipment No. */
         std::string projection("{\"_id\" : false, \"shipmentNo\" : true}");
         std::string content = http.body();
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http request body length %d \n Request Body %s\n"), content.length(), content.c_str()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http request body length:%d \n Request http_body:%s\n"), content.length(), content.c_str()));
+
         if(content.length()) {
-            std::string record = dbInst.create_document(collectionName, content);
+
+            std::string record = dbInst.create_document(dbInst.get_database(), collectionName, content);
 
             if(record.length()) {
                 std::string rsp("");
                 rsp = "{\"oid\" : \"" + record + "\"}";
                 return(build_responseOK(rsp));
             }
-        } 
-    } else if(!uri.compare("/api/account")) {
-        std::string collectionName("account");
-        /*We need newly created account Code */
-        std::string projection("{\"_id\" : false, \"accountCode\" : true}");
-        std::string content = http.body();
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http request body length %d \n Request Body %s\n"), content.length(), content.c_str()));
-        if(content.length()) {
-            std::string oid = dbInst.create_document(collectionName, content);
-
-            if(oid.length()) {
-                //std::string rsp = dbInst.get_byOID(collectionName, projection, oid);
-                std::string rsp("");
-                rsp = "{\"oid\" : \"" + oid + "\"}";
-
-                return(build_responseOK(rsp));
-            }
         }
-    } else if(!uri.compare("/api/bulk/shipping")) {
+
+    } else if(!uri.compare("/api/v1/shipment/bulk/shipping")) {
         std::string content = http.body();
         std::string coll("shipping");
+
         if(content.length()) {
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
-            std::int32_t cnt = dbInst.create_bulk_document(coll, content);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length:%d \n"), content.length()));
+
+            std::int32_t cnt = dbInst.create_bulk_document(dbInst.get_database() ,coll, content);
 
             if(cnt) {
                 std::string rec = "{\"createdShipments\": " + std::to_string(cnt) + "}";
@@ -242,8 +317,8 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 return(build_responseERROR(err_message, err));
             }
         }
-    } //else if(!uri.compare("/api/vendor/v1/ajoul/authorize")) {
-        else if(!uri.compare("/api/v1/ajoul/shipment/create")) {
+
+    } else if(!uri.compare("/api/v1/shipment/thirdparty/ajoul")) {
         //std::string req("{\"Shipment\":{\"reference\":\"AB100\",\"pickup_date\":null,\"pickup_time\":null,\"product_type\":\"104\",\"product_price\":null,\"destination\":\"RUH\",\"origin\":\"RUH\",\"parcel_quantity\":\"2\",\"parcel_weight\":\"4\",\"payment_mode\":\"COD\",\"service_id\":\"2\",\"description\":\"Testing Create Shipment From API\",\"sku\":\"423423\",\"customer_lng\":null,\"customer_lat\":null,\"sender\":{\"name\":\"Alaa\",\"address\":\"Al Haram street, Giza\",\"zip_code\":null,\"phone\":\"01063396459\",\"email\":\"admin@quadratechsoft.com\"},\"receiver\":{\"name\":\"Alaa\",\"address\":\"AL Malki, Damascuss\",\"zip_code\":\"1234\",\"phone\":\"0941951819\",\"phone2\":\"09419518549\",\"email\":\"info@quadratechsoft.com\"}},\"TrackingNumber\":\"AR222188000614391\",\"printLable\":\"https:\/\/ajoul.com\/printlabelone\/AR222188000614391\"}");
         //std::string awbNo = dbInst.get_value(req, "TrackingNumber");
         //ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l TrackingNumber %s \n"), awbNo.c_str()));
@@ -414,14 +489,54 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 }
             }
         }
-    } else if(!uri.compare("/api/manifest")) {
+    }
+    return(std::string());
+}
+
+std::string MicroService::handle_account_POST(std::string& in, MongodbClient& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/v1/account/account")) {
+        std::string collectionName("account");
+        /*We need newly created account Code */
+        std::string projection("{\"_id\" : false, \"accountCode\" : true}");
+        std::string content = http.body();
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http request body length:%d \n Request http_body:%s\n"), content.length(), content.c_str()));
+
+        if(content.length()) {
+            std::string oid = dbInst.create_document(dbInst.get_database(), collectionName, content);
+
+            if(oid.length()) {
+                //std::string rsp = dbInst.get_byOID(collectionName, projection, oid);
+                std::string rsp("");
+                rsp = "{\"oid\" : \"" + oid + "\"}";
+
+                return(build_responseOK(rsp));
+            }
+        }
+    }
+    return(std::string());
+}
+
+std::string MicroService::handle_inventory_POST(std::string& in, MongodbClient& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/v1/inventory/manifest")) {
         /* Creating sku for inventory */
         std::string content = http.body();
         std::string coll("inventory");
 
         if(content.length()) {
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
-            std::string record = dbInst.create_document(coll, content);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length:%d \n"), content.length()));
+            std::string record = dbInst.create_document(dbInst.get_database(), coll, content);
 
             if(record.length()) {
                 std::string rsp("");
@@ -429,7 +544,57 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
                 return(build_responseOK(rsp));
             }
         }
-    } else if(!uri.compare("/api/v1/email/send")) {
+    }
+    return(std::string());
+}
+
+std::string MicroService::handle_document_POST(std::string& in, MongodbClient& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/v1/document/upload")) {
+        std::string content = http.body();
+        std::string coll("attachment");
+
+        if(content.length()) {
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
+            std::string value("");
+            auto result = dbInst.from_json_element_to_string(content, "corporate", value);
+
+            if(!result) {
+                coll.clear();
+                coll = value + "_attachment";
+            }
+
+            std::string record = dbInst.create_document(dbInst.get_database(), coll, content);
+
+            if(record.length()) {
+                std::string rsp("");
+                rsp = "{\"oid\" : \"" + record + "\"}";
+                return(build_responseOK(rsp));
+
+            } else {
+                std::string err("400 Bad Request");
+                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"attachment upload failed\", \"errorCode\" : 400}");
+                return(build_responseERROR(err_message, err));
+
+            }
+        }
+    }
+    return(std::string());
+}
+
+std::string MicroService::handle_email_POST(std::string& in, MongodbClient& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/v1/email/send")) {
         /* Send e-mail with POST request */
         // {"subject": "", "to": [user-id@domain.com, user-id1@domain.com], "body": ""}
         std::string json_body = http.body();
@@ -461,47 +626,8 @@ std::string MicroService::handle_POST(std::string& in, MongodbClient& dbInst)
         SMTP::User email;
         email.startEmailTransaction();
 
-    } else if(!uri.compare("/api/v1/document/upload")) {
-        std::string content = http.body();
-        std::string coll("attachment");
-
-        if(content.length()) {
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
-            std::string value("");
-            auto result = dbInst.from_json_element_to_string(content, "corporate", value);
-
-            if(!result) {
-                coll.clear();
-                coll = value + "_attachment";
-            }
-
-            std::string record = dbInst.create_document(coll, content);
-
-            if(record.length()) {
-                std::string rsp("");
-                rsp = "{\"oid\" : \"" + record + "\"}";
-                return(build_responseOK(rsp));
-            } else {
-                std::string err("400 Bad Request");
-                std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"attachment upload failed\", \"errorCode\" : 400}");
-                return(build_responseERROR(err_message, err));
-            }
-        }
-    } else if(!uri.compare("/api/v1/db/config")) {
-        std::string content = http.body();
-        
-        if(content.length()) {
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l http body length %d \n"), content.length()));
-            std::string ip_address("");
-            auto result = dbInst.from_json_element_to_string(content, "ip_address", ip_address);
-            std::string port("");
-            result = dbInst.from_json_element_to_string(content, "port", port);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l dbconfig ip:%s port:%u\n"), ip_address.c_str(), std::stoul(port)));
-            /* Apply this config if changed */
-        }
     }
-
-    return(build_responseOK(std::string()));
+    return(std::string());
 }
 
 std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
@@ -513,7 +639,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
     std::string uri(http.get_uriName());
 
     ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l API Name %s\n"), uri.c_str()));
-    if(!uri.compare("/api/login")) {
+    if(!uri.compare("/api/v1/account/login")) {
         std::string collectionName("account");
 
         /* user is trying to log in - authenticate now */
@@ -542,7 +668,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
     
-    } else if(!uri.compare("/api/accountlist")) {
+    } else if(!uri.compare("/api/v1/account/accountlist")) {
         std::string collectionName("account");
 
         /* do an authentication with DB now */
@@ -563,7 +689,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Customer Account Info %s\n"), record.c_str()));
         return(build_responseOK(record));
 
-    } else if(!uri.compare("/api/account")) {
+    } else if(!uri.compare("/api/v1/account/account")) {
           std::string collectionName("account");
 
         /* user is trying to log in - authenticate now */
@@ -586,7 +712,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             }
         }
 
-    } else if(!uri.compare("/api/shipping") || (!uri.compare("/api/shipment"))) {
+    } else if(!uri.compare("/api/v1/shipment/shipping") || (!uri.compare("/api/v1/shipment/shipment"))) {
         std::string collectionName("shipping");
         auto awbNo = http.get_element("shipmentNo");
         auto accountCode = http.get_element("accountCode");
@@ -603,7 +729,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l AWB Way Bills %s\n"), record.c_str()));
             return(build_responseOK(record));
         }
-    } else if((!uri.compare("/api/altrefno"))) {
+    } else if((!uri.compare("/api/v1/shipment/altrefno"))) {
         std::string collectionName("shipping");
         auto altRefNo = http.get_element("altRefNo");
         auto accCode = http.get_element("accountCode");
@@ -632,7 +758,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
-    } else if((!uri.compare("/api/awbno"))) {
+    } else if((!uri.compare("/api/v1/shipment/awbno"))) {
         std::string collectionName("shipping");
         auto awbNo = http.get_element("shipmentNo");
         auto accCode = http.get_element("accountCode");
@@ -661,7 +787,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
-    } else if(!uri.compare("/api/awbnolist")) {
+    } else if(!uri.compare("/api/v1/shipment/awbnolist")) {
         std::string collectionName("shipping");
         auto awbNo = http.get_element("awbNo");
         auto accCode = http.get_element("accountCode");
@@ -707,7 +833,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
-    } else if(!uri.compare("/api/altrefnolist")) {
+    } else if(!uri.compare("/api/v1/shipment/altrefnolist")) {
         std::string collectionName("shipping");
         auto awbNo = http.get_element("awbNo");
         auto accCode = http.get_element("accountCode");
@@ -753,7 +879,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
-    } else if(!uri.compare("/api/senderrefnolist")) {
+    } else if(!uri.compare("/api/v1/shipment/senderrefnolist")) {
         std::string collectionName("shipping");
         auto refNo = http.get_element("awbNo");
         auto accCode = http.get_element("accountCode");
@@ -799,7 +925,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
-    } else if(!uri.compare("/api/senderrefno")) {
+    } else if(!uri.compare("/api/v1/shipment/senderrefno")) {
         std::string collectionName("shipping");
         auto refNo = http.get_element("senderRefNo");
         auto accCode = http.get_element("accountCode");
@@ -827,7 +953,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
             return(build_responseERROR(err_message, err));
         }
-    } else if(!uri.compare("/api/detailed_report")) {
+    } else if(!uri.compare("/api/v1/shipment/detailed_report")) {
         std::string collectionName("shipping");
         auto fromDate = http.get_element("fromDate");
         auto toDate = http.get_element("toDate");
@@ -874,7 +1000,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Invalid AWB Bill No.\", \"error\" : 400}");
             return(build_responseERROR(err_message, err));
         }
-    } else if((!uri.compare("/api/shipmentlist"))) {
+    } else if((!uri.compare("/api/v1/shipment/shipmentlist"))) {
         std::string collectionName("shipping");
         auto fromDate = http.get_element("fromDate");
         auto toDate = http.get_element("toDate");
@@ -919,7 +1045,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
             return(build_responseERROR(err_message, err));
         }
 
-    } else if(!uri.compare("/api/manifest")) {
+    } else if(!uri.compare("/api/v1/inventory/manifest")) {
       /* GET for inventory - could be all or based on sku */
         std::string document("");
         auto sku = http.get_element("sku");
@@ -1087,6 +1213,13 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
     return(build_responseOK(std::string()));
 }
 
+/**
+ * @brief this member function is used to Update the collection for a given uri.
+ * 
+ * @param in 
+ * @param dbInst 
+ * @return std::string 
+ */
 std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
 {
     /* Check for Query string */
@@ -1095,7 +1228,7 @@ std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
-    if(!uri.compare("/api/shipment")) {
+    if(!uri.compare("/api/v1/shipment/shipment")) {
         /** Update on Shipping */
         std::string coll("shipping");
         std::string content = http.body();
@@ -1141,7 +1274,7 @@ std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
         std::string err("400 Bad Request");
         std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
         return(build_responseERROR(err_message, err));
-    } else if(!uri.compare("/api/manifest")) {
+    } else if(!uri.compare("/api/v1/inventory/manifest")) {
       /* Updating inventory */
         std::string coll("inventory");
         std::string content = http.body();

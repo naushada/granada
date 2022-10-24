@@ -93,7 +93,15 @@ class MicroService : public ACE_Task<ACE_MT_SYNCH> {
         std::int32_t process_request(ACE_HANDLE handle, std::string& req, MongodbClient& dbInst);
         std::string handle_OPTIONS(std::string& in);
         std::string handle_GET(std::string& in, MongodbClient& dbInst);
+
         std::string handle_POST(std::string& in, MongodbClient& dbInst);
+        std::string handle_shipment_POST(std::string& in, MongodbClient& dbInst);
+        std::string handle_account_POST(std::string& in, MongodbClient& dbInst);
+        std::string handle_inventory_POST(std::string& in, MongodbClient& dbInst);
+        std::string handle_email_POST(std::string& in, MongodbClient& dbInst);
+        std::string handle_document_POST(std::string& in, MongodbClient& dbInst);
+        std::string handle_config_POST(std::string& in, MongodbClient& dbInst);
+
         std::string handle_PUT(std::string& in, MongodbClient& dbInst);
         std::string handle_DELETE(std::string& in, MongodbClient& dbInst);
         std::string build_responseOK(std::string http_body, std::string content_type="application/json");
