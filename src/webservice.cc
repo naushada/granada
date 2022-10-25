@@ -1259,72 +1259,63 @@ std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
+    if(!uri.compare(0, 16, "/api/v1/shipment")) {
+        return(handle_shipment_PUT(in, dbInst));
+
+    } else if(!uri.compare(0, 17, "/api/v1/inventory")) {
+        return(handle_inventory_PUT(in, dbInst));
+
+    } else {
+        std::string err("400 Bad Request");
+        std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
+        return(build_responseERROR(err_message, err));
+    }
+}
+
+std::string MicroService::handle_shipment_PUT(std::string& in, MongodbClient& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
     if(!uri.compare("/api/v1/shipment/shipment")) {
         /** Update on Shipping */
         std::string coll("shipping");
         std::string content = http.body();
         std::string awbNo = http.get_element("shipmentNo");
+        std::string accCode = http.get_element("accountCode");
+
         std::string lst("[");
         std::string delim = ",";
         auto start = 0U;
         auto end = awbNo.find(delim);
+
         while (end != std::string::npos)
         {
             lst += "\"" + awbNo.substr(start, end - start) + "\"" + delim;
             start = end + delim.length();
             end = awbNo.find(delim, start);
         }
+
         lst += "\"" + awbNo.substr(start) + "\"";
         lst += "]";
 
-        #if 0
-        std::string accountCode = http.get_element("accountCode");
-        std::string query = "{\"accountCode\" : \"" +
-                             accountCode + "\" ," +
-                             "\"shipmentNo\" : \"" +
-                             awbNo + "\"" +
-                             "}";
-        #endif
-        std::string query = "{\"shipmentNo\" : {\"$in\" :" +
+        std::string query("");
+        if(awbNo.length() && accCode.length()) {
+            query = "{\"shipmentNo\" : {\"$in\" :" +
+                                    lst + "}," + "\"activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}" +
+                                    ",\"accountCode\": \"" + accCode + "\"}"; 
+        
+        } else if(awbNo.length()) {
+            query = "{\"shipmentNo\" : {\"$in\" :" +
                              lst + "}," + "\"activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}"+ "}";
+        }
 
-        #if 0
-        std::string query = "{\"shipmentNo\" : " +
-                             lst + "}";
-
-        #endif
         std::string document = "{\"$push\": {\"activity\" : " + content + "}}";
 
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n Query %s\n"), document.c_str(), query.c_str()));
-        bool rsp = dbInst.update_collection(coll, query, document);
-        if(rsp) {
-            std::string r("");
-            r = "{\"status\": \"success\"}";
-            return(build_responseOK(r));
-        }
-        std::string err("400 Bad Request");
-        std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
-        return(build_responseERROR(err_message, err));
-    } else if(!uri.compare("/api/v1/inventory/manifest")) {
-      /* Updating inventory */
-        std::string coll("inventory");
-        std::string content = http.body();
-
-        std::string sku = http.get_element("sku");
-        std::string qty = http.get_element("qty");
-        std::string acc = http.get_element("accountCode");
-        std::string query;
-
-        if(sku.length() && qty.length() & acc.length()) {
-          query = "{\"sku\" : \"" + sku +"\"," + "\"accountCode\" :" + "\"" + acc + "\"}";
-        } else if(sku.length() && qty.length()) {
-          query = "{\"sku\" : \"" + sku + "\"}";
-        }
-
-        std::string document = "{\"$inc\": {\"qty\" : -" + qty + "}}";
-
-
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document %s\n Query %s\n"), document.c_str(), query.c_str()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document:%s\n query:%s\n"), document.c_str(), query.c_str()));
         bool rsp = dbInst.update_collection(coll, query, document);
 
         if(rsp) {
@@ -1337,7 +1328,57 @@ std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
         return(build_responseERROR(err_message, err));
     }
 
-    return(build_responseOK(std::string()));
+    return(std::string());
+}
+
+std::string MicroService::handle_inventory_PUT(std::string& in, MongodbClient& dbInst)
+{
+    /* Check for Query string */
+    Http http(in);
+
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/v1/inventory/manifest")) {
+      /* Updating inventory */
+        std::string coll("inventory");
+        std::string content = http.body();
+
+        std::string sku = http.get_element("sku");
+        std::string qty = http.get_element("qty");
+        std::string acc = http.get_element("accountCode");
+        std::string query;
+
+        if(sku.length() && qty.length() & acc.length()) {
+          query = "{\"sku\" : \"" + sku +"\"," + "\"accountCode\" :" + "\"" + acc + "\"}";
+
+        } else if(sku.length() && qty.length()) {
+          query = "{\"sku\" : \"" + sku + "\"}";
+
+        }
+
+        std::string document = "{\"$inc\": {\"qty\" : -" + qty + "}}";
+
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document:%s\n query:%s\n"), document.c_str(), query.c_str()));
+        bool rsp = dbInst.update_collection(coll, query, document);
+
+        if(rsp) {
+            std::string r("");
+            r = "{\"status\": \"success\"}";
+            return(build_responseOK(r));
+        }
+
+        std::string err("400 Bad Request");
+        std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
+        return(build_responseERROR(err_message, err));
+    }
+
+    return(std::string());
+}
+
+std::string MicroService::handle_account_PUT(std::string& in, MongodbClient& dbInst)
+{
+
 }
 
 std::string MicroService::handle_OPTIONS(std::string& in)
@@ -1400,20 +1441,13 @@ std::string MicroService::build_responseOK(std::string httpBody, std::string con
     } else {
         http_header += "Content-Length: 0\r\n";
     }
-
-    //ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1KB) + httpBody.length()), nullptr);
-
-    //std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    //rsp->wr_ptr(http_header.length());
     rsp = http_header;
 
     if(httpBody.length()) {
-        //std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
-        //rsp->wr_ptr(httpBody.length());
         rsp += httpBody;
     }
 
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response header\n%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length:%d response header:%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
     return(rsp);
 }
 
@@ -1435,14 +1469,7 @@ std::string MicroService::build_responseERROR(std::string httpBody, std::string 
         http_header += "Content-Length: 0\r\n";
     }
 
-    //ACE_NEW_RETURN(rsp, ACE_Message_Block(std::size_t(MemorySize::SIZE_1KB) + httpBody.length()), nullptr);
-
-    //std::memcpy(rsp->wr_ptr(), http_header.c_str(), http_header.length());
-    //rsp->wr_ptr(http_header.length());
-    //std::memcpy(rsp->wr_ptr(), httpBody.c_str(), httpBody.length());
-    //rsp->wr_ptr(httpBody.length());
-
-    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length %d response header\n%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
+    ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l respone length:%d response header:%s"), (http_header.length() + httpBody.length()), http_header.c_str()));
     return(http_header);
 }
 
