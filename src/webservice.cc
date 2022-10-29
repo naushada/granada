@@ -280,7 +280,7 @@ std::string MicroService::handle_shipment_POST(std::string& in, MongodbClient& d
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
-    if(!uri.compare("/api/v1/shipment/single/shipping")) {
+    if(!uri.compare("/api/v1/shipment/shipping")) {
         std::string collectionName("shipping");
 
         /*We need newly shipment No. */
