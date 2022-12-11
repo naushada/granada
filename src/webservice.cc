@@ -748,7 +748,7 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
 
     if(!uri.compare("/api/v1/shipment/shipping")) {
         
-        auto awbNo = http.get_element("shipmentNo");
+        auto awbNo = http.get_element("awbNo");
         auto accountCode = http.get_element("accountCode");
 
         if(awbNo.length() && accountCode.length()) {
@@ -769,9 +769,13 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
             lst += "]";
         
             /* do an authentication with DB now */
+            /*
             auto document = "{\"shipmentNo\" : {\"$in\" :" +
                                lst + "}, \"accountCode\": \"" +
-                               accountCode + "\"}";
+                               accountCode + "\"}";*/
+            std::stringstream document("");
+            document << "{\"shipment.shipmentInformation.awbNo\": {\"$in\": " << lst << "}"
+                     << "\"shipment.shipmentInformation.awbNo\": {\"$in\": "
         
             std::string projection("{\"_id\" : false}");
             std::string record = dbInst.get_documents(collectionName, document, projection);
@@ -796,12 +800,15 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
             lst += "]";
         
             /* do an authentication with DB now */
+            std::stringstream document("");
+            document << "{\"shipment.shipmentInformation.awbNo\": {\"$in\": " << lst << "}}";
+            /*
             auto document = "{\"shipmentNo\" : {\"$in\" :" +
-                               lst + "}}";
+                               lst + "}}";*/
             
             std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.get_documents(collectionName, document, projection);
-            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awbNo response:%s\n"), record.c_str()));
+            std::string record = dbInst.get_documents(collectionName, document.str(), projection);
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l document:%s awbNo response:%s\n"), document.str().c_str(),record.c_str()));
             if(record.length()) {
                 return(build_responseOK(record));
             } else {
