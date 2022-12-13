@@ -774,11 +774,12 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
                                lst + "}, \"accountCode\": \"" +
                                accountCode + "\"}";*/
             std::stringstream document("");
+            #if 0
             document << "{\"shipment.shipmentInformation.awbNo\": {\"$in\": " << lst << "}"
                      << "\"shipment.shipmentInformation.awbNo\": {\"$in\": "
-        
+            #endif
             std::string projection("{\"_id\" : false}");
-            std::string record = dbInst.get_documents(collectionName, document, projection);
+            std::string record = dbInst.get_documents(collectionName, document.str(), projection);
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l awb shipment(s):%s\n"), record.c_str()));
             return(build_responseOK(record));
 
