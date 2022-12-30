@@ -646,6 +646,9 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
     } else if(!uri.compare(0, 16, "/api/v1/document")) {
         return(handle_document_GET(in, dbInst));
         
+    } else if(!uri.compare(0, 15, "/api/v1/account")) {
+        return(handle_account_GET(in, dbInst));
+
     } else if((!uri.compare(0, 7, "/webui/"))) {
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l frontend Request %s\n"), uri.c_str()));
         /* build the file name now */
@@ -1113,8 +1116,8 @@ std::string MicroService::handle_account_GET(std::string& in, MongodbClient& dbI
 
         if(user.length() && pwd.length()) {
             /* do an authentication with DB now */
-            std::string document = "{\"accountCode\" : \"" +  user + "\", " + 
-                                   "\"accountPassword\" : \"" + pwd + "\"" + 
+            std::string document = "{\"loginCredentials.accountCode\" : \"" +  user + "\", " + 
+                                   "\"loginCredentials.accountPassword\" : \"" + pwd + "\"" + 
                                     "}";
             //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
             std::string projection("{\"_id\" : false}");
@@ -1128,12 +1131,12 @@ std::string MicroService::handle_account_GET(std::string& in, MongodbClient& dbI
             } else {
                 return(build_responseOK(record));
             }
-        } else if(http.get_element("accountCode").length()) {
+        } else if(http.get_element("userId").length()) {
 
-            auto accCode = http.get_element("accountCode");
+            auto accCode = http.get_element("userId");
             
             /* do an authentication with DB now */
-            std::string document = "{\"accountCode\" : \"" +  user + "\" " + 
+            std::string document = "{\"loginCredentials.accountCode\" : \"" +  accCode + "\" " + 
                                     "}";
             //std::string projection("{\"accountCode\" : true, \"_id\" : false}");
             std::string projection("{\"_id\" : false}");
@@ -1273,6 +1276,9 @@ std::string MicroService::handle_PUT(std::string& in, MongodbClient& dbInst)
     } else if(!uri.compare(0, 17, "/api/v1/inventory")) {
         return(handle_inventory_PUT(in, dbInst));
 
+    } else if(!uri.compare(0, 15, "/api/v1/account")) {
+        return(handle_account_PUT(in, dbInst));
+
     } else {
         std::string err("400 Bad Request");
         std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
@@ -1386,7 +1392,41 @@ std::string MicroService::handle_inventory_PUT(std::string& in, MongodbClient& d
 
 std::string MicroService::handle_account_PUT(std::string& in, MongodbClient& dbInst)
 {
+    /* Check for Query string */
+    Http http(in);
 
+    /* Action based on uri in get request */
+    std::string uri(http.get_uriName());
+
+    if(!uri.compare("/api/v1/account/account")) {
+        /* Updating inventory */
+        std::string coll("account");
+        std::string content = http.body();
+        std::string accCode = http.get_element("userId");
+      
+        std::string query;
+
+        if(accCode.length()) {
+          query = "{\"loginCredentials.accountCode\" : \"" + accCode + "\"}";
+        }
+
+        std::string document;
+        document = "{\"$update\":" + content + "}";
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document:%s\n query:%s\n"), document.c_str(), query.c_str()));
+        bool rsp = dbInst.update_collection(coll, query, document);
+
+        if(rsp) {
+            std::string r("");
+            r = "{\"status\": \"success\"}";
+            return(build_responseOK(r));
+        }
+
+        std::string err("400 Bad Request");
+        std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
+        return(build_responseERROR(err_message, err));
+    }
+
+    return(std::string());
 }
 
 std::string MicroService::handle_OPTIONS(std::string& in)
