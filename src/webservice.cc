@@ -594,7 +594,7 @@ std::string MicroService::handle_email_POST(std::string& in, MongodbClient& dbIn
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
-    if(!uri.compare("/api/v1/email/send")) {
+    if(!uri.compare("/api/v1/email")) {
         /* Send e-mail with POST request */
         // {"subject": "", "to": [user-id@domain.com, user-id1@domain.com], "body": ""}
         std::string json_body = http.body();
@@ -602,21 +602,28 @@ std::string MicroService::handle_email_POST(std::string& in, MongodbClient& dbIn
         std::vector<std::tuple<std::string, std::string>> out_list;
         std::string subj;
         std::string body;
+        std::string from;
+        std::string passwd;
+
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email request:%s\n"), json_body.c_str()));
         dbInst.from_json_array_to_vector(json_body, "to", out_vec);
         dbInst.from_json_element_to_string(json_body, "subject", subj);
-        dbInst.from_json_element_to_string(json_body, "body", body);
+        dbInst.from_json_element_to_string(json_body, "emailbody", body);
         dbInst.from_json_object_to_map(json_body, "files", out_list);
+        dbInst.from_json_element_to_string(json_body, "from", from);
+        dbInst.from_json_element_to_string(json_body, "passwd", passwd);
 
         for(const auto& elm: out_vec) {
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email to list:%s\n"), elm.c_str()));
         }
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email subject:%s\n"), subj.c_str()));
+        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email subject:%s from:%s passwd:%s\n"), subj.c_str(), from.c_str(), passwd.c_str()));
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l email body:%s\n"), body.c_str()));
 
         SMTP::Account::instance().to_email(out_vec);
         SMTP::Account::instance().email_subject(subj);
         SMTP::Account::instance().email_body(body);
+        SMTP::Account::instance().from_email(from);
+        SMTP::Account::instance().from_password(passwd);
 
         if(!out_list.empty()) {
             /* e-mail with attachment */
@@ -625,6 +632,8 @@ std::string MicroService::handle_email_POST(std::string& in, MongodbClient& dbIn
 
         SMTP::User email;
         email.startEmailTransaction();
+        std::string rsp("{\"status\": \"success\"");
+        return(build_responseOK(rsp));
 
     }
     return(std::string());

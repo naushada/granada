@@ -589,9 +589,16 @@ std::uint32_t SMTP::BODY::onCommand(std::string in, std::string& out, States& ne
     /// MIME Header
     ss << "MIME-Version: 1.0" << "\r\n"
        //<< "Content-type: text/plain; charset=us-ascii" << "\r\n"
-       << "From: "<<  Account::instance().from_name() << " <" << Account::instance().from_email() << ">\r\n"
-       << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
-       << "Subject: " << Account::instance().email_subject() <<"\r\n"
+       << "From: "<<  Account::instance().from_name() << " <" << Account::instance().from_email() << ">\r\n";
+
+    auto to = Account::instance().to_email();
+    ss << "To: ";
+    for(auto &it : to) {
+        ss << it << ";";
+    }
+    //ss << "To: Naushad Ahmed <naushad.dln@gmail.com>" << "\r\n"
+    ss << "\r\n";
+    ss << "Subject: " << Account::instance().email_subject() <<"\r\n"
        //asctime is appending the \n line character, so don't need to add explicitly.
        << "Date: " << std::asctime(std::localtime(&result));
 
