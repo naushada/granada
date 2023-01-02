@@ -529,7 +529,7 @@ std::string MicroService::handle_inventory_POST(std::string& in, MongodbClient& 
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
-    if(!uri.compare("/api/v1/inventory/manifest")) {
+    if(!uri.compare("/api/v1/inventory")) {
         /* Creating sku for inventory */
         std::string content = http.body();
         std::string coll("inventory");
@@ -1184,18 +1184,19 @@ std::string MicroService::handle_inventory_GET(std::string& in, MongodbClient& d
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
-    if(!uri.compare("/api/v1/inventory/manifest")) {
+    if(!uri.compare("/api/v1/inventory")) {
       /* GET for inventory - could be all or based on sku */
         std::string document("");
         auto sku = http.get_element("sku");
         auto accCode = http.get_element("accountCode");
 
-        if(accCode.length() > 0) {
+        if(accCode.length() > 0 && sku.length() > 0) {
             document = "{\"accountCode\": \"" + accCode + "\", \"sku\" : \""  + sku + "\"}"; 
 
+        } else if (accCode.length() > 0) {
+            document = "{\"accountCode\" : \""  + accCode + "\"}"; 
         } else {
             document = "{\"sku\" : \""  + sku + "\"}"; 
-
         }
 
         std::string collectionName("inventory");
@@ -1362,7 +1363,7 @@ std::string MicroService::handle_inventory_PUT(std::string& in, MongodbClient& d
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
-    if(!uri.compare("/api/v1/inventory/manifest")) {
+    if(!uri.compare("/api/v1/inventory")) {
       /* Updating inventory */
         std::string coll("inventory");
         std::string content = http.body();
@@ -1370,17 +1371,23 @@ std::string MicroService::handle_inventory_PUT(std::string& in, MongodbClient& d
         std::string sku = http.get_element("sku");
         std::string qty = http.get_element("qty");
         std::string acc = http.get_element("accountCode");
+        std::string isUpdate = http.get_element("isUpdate");
         std::string query;
 
         if(sku.length() && qty.length() & acc.length()) {
           query = "{\"sku\" : \"" + sku +"\"," + "\"accountCode\" :" + "\"" + acc + "\"}";
 
-        } else if(sku.length() && qty.length()) {
+        } else if(sku.length()) {
           query = "{\"sku\" : \"" + sku + "\"}";
 
         }
 
-        std::string document = "{\"$inc\": {\"qty\" : -" + qty + "}}";
+        std::string document("");
+        if(isUpdate.length()) {
+            document = "{\"$inc\": {\"qty\": " + qty + "}}";
+        } else {
+            document = "{\"$inc\": {\"qty\" : -" + qty + "}}";
+        }
 
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document:%s\n query:%s\n"), document.c_str(), query.c_str()));
         bool rsp = dbInst.update_collection(coll, query, document);
