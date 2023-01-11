@@ -29,6 +29,7 @@ target_link_libraries(offtarget ACE)
 target_link_libraries(offtarget ACE_SSL)
 target_link_libraries(offtarget ssl crypto)
 target_link_libraries(offtarget mongodbcxx)
+target_link_libraries(offtarget gtest)
 
 add_test(offtarget_gtests offtarget)
 gtest_discover_tests(offtarget)

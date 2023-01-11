@@ -1086,7 +1086,7 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
             auto toDate = http.get_element("toDate");
             std::string document("");
 
-            document = "{\"shipment.shipmentInformation.activity.0.date\" : {\"$gte\": \""  + fromDate + "\"," + 
+            document = "{\"shipment.shipmentInformation.createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
                         "\"$lte\": \"" + toDate + "\"}}"; 
         
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The query:%s\n"), document.c_str()));
