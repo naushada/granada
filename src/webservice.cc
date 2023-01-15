@@ -787,8 +787,8 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
                                accountCode + "\"}";*/
             std::stringstream document("");
             #if 0
-            document << "{\"shipment.shipmentInformation.awbNo\": {\"$in\": " << lst << "}"
-                     << "\"shipment.shipmentInformation.awbNo\": {\"$in\": "
+            document << "{\"shipment.awbno\": {\"$in\": " << lst << "}"
+                     << "\"shipment.awbno\": {\"$in\": "
             #endif
             std::string projection("{\"_id\" : false}");
             std::string record = dbInst.get_documents(collectionName, document.str(), projection);
@@ -814,7 +814,7 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
         
             /* do an authentication with DB now */
             std::stringstream document("");
-            document << "{\"shipment.shipmentInformation.awbNo\": {\"$in\": " << lst << "}}";
+            document << "{\"shipment.awbno\": {\"$in\": " << lst << "}}";
             /*
             auto document = "{\"shipmentNo\" : {\"$in\" :" +
                                lst + "}}";*/
