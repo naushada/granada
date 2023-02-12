@@ -1304,52 +1304,81 @@ std::string MicroService::handle_shipment_PUT(std::string& in, MongodbClient& db
     /* Action based on uri in get request */
     std::string uri(http.get_uriName());
 
-    if(!uri.compare("/api/v1/shipment/shipment")) {
+    if(!uri.compare("/api/v1/shipment/shipping")) {
         /** Update on Shipping */
         std::string coll("shipping");
         std::string content = http.body();
         std::string awbNo = http.get_element("shipmentNo");
         std::string accCode = http.get_element("accountCode");
+        std::string isSingleShipment = http.get_element("isSingleShipment");
 
-        std::string lst("[");
-        std::string delim = ",";
-        auto start = 0U;
-        auto end = awbNo.find(delim);
-
-        while (end != std::string::npos)
-        {
-            lst += "\"" + awbNo.substr(start, end - start) + "\"" + delim;
-            start = end + delim.length();
-            end = awbNo.find(delim, start);
-        }
-
-        lst += "\"" + awbNo.substr(start) + "\"";
-        lst += "]";
-
-        std::string query("");
-        if(awbNo.length() && accCode.length()) {
-            query = "{\"shipmentNo\" : {\"$in\" :" +
-                                    lst + "}," + "\"activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}" +
+        if(isSingleShipment.length() > 0) {
+            std::string query("");
+            if(awbNo.length() && accCode.length()) {
+                query = "{\"shipment.awbno\" : \"" +
+                                    awbNo + "\"," + "\"shipment.shipmentInformation.activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}" +
                                     ",\"accountCode\": \"" + accCode + "\"}"; 
         
-        } else if(awbNo.length()) {
-            query = "{\"shipmentNo\" : {\"$in\" :" +
+            } else if(awbNo.length()) {
+                query = "{\"shipment.awbno\" :\"" +
+                             awbNo + "\"," + "\"shipment.shipmentInformation.activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}"+ "}";
+            }
+            
+            std::string document = "{\"$set\": " + content + "}";
+
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document:%s\n query:%s\n"), document.c_str(), query.c_str()));
+            bool rsp = dbInst.update_collection(coll, query, document);
+            if(rsp) {
+                std::string r("");
+                r = "{\"status\": \"success\"}";
+                return(build_responseOK(r));
+            }
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
+
+        } else {
+
+            std::string lst("[");
+            std::string delim = ",";
+            auto start = 0U;
+            auto end = awbNo.find(delim);
+
+            while (end != std::string::npos)
+            {
+                lst += "\"" + awbNo.substr(start, end - start) + "\"" + delim;
+                start = end + delim.length();
+                end = awbNo.find(delim, start);
+            }
+
+            lst += "\"" + awbNo.substr(start) + "\"";
+            lst += "]";
+
+            std::string query("");
+            if(awbNo.length() && accCode.length()) {
+                query = "{\"shipmentNo\" : {\"$in\" :" +
+                                        lst + "}," + "\"activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}" +
+                                        ",\"accountCode\": \"" + accCode + "\"}"; 
+        
+            } else if(awbNo.length()) {
+                query = "{\"shipmentNo\" : {\"$in\" :" +
                              lst + "}," + "\"activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}"+ "}";
+            }
+
+            std::string document = "{\"$push\": {\"activity\" : " + content + "}}";
+
+            ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document:%s\n query:%s\n"), document.c_str(), query.c_str()));
+            bool rsp = dbInst.update_collection(coll, query, document);
+        
+            if(rsp) {
+                std::string r("");
+                r = "{\"status\": \"success\"}";
+                return(build_responseOK(r));
+            }
+            std::string err("400 Bad Request");
+            std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
+            return(build_responseERROR(err_message, err));
         }
-
-        std::string document = "{\"$push\": {\"activity\" : " + content + "}}";
-
-        ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document:%s\n query:%s\n"), document.c_str(), query.c_str()));
-        bool rsp = dbInst.update_collection(coll, query, document);
-
-        if(rsp) {
-            std::string r("");
-            r = "{\"status\": \"success\"}";
-            return(build_responseOK(r));
-        }
-        std::string err("400 Bad Request");
-        std::string err_message("{\"status\" : \"faiure\", \"cause\" : \"Shipment Updated Failed\", \"error\" : 400}");
-        return(build_responseERROR(err_message, err));
     }
 
     return(std::string());
