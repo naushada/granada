@@ -1140,9 +1140,9 @@ std::string MicroService::handle_account_GET(std::string& in, MongodbClient& dbI
             } else {
                 return(build_responseOK(record));
             }
-        } else if(http.get_element("userId").length()) {
+        } else if(http.get_element("accountCode").length()) {
 
-            auto accCode = http.get_element("userId");
+            auto accCode = http.get_element("accountCode");
             
             /* do an authentication with DB now */
             std::string document = "{\"loginCredentials.accountCode\" : \"" +  accCode + "\" " + 
