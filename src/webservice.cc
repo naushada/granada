@@ -1356,16 +1356,16 @@ std::string MicroService::handle_shipment_PUT(std::string& in, MongodbClient& db
 
             std::string query("");
             if(awbNo.length() && accCode.length()) {
-                query = "{\"shipmentNo\" : {\"$in\" :" +
-                                        lst + "}," + "\"activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}" +
+                query = "{\"shipment.awbno\" : {\"$in\" :" +
+                                        lst + "}," + "\"shipment.shipmentInformation.activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}" +
                                         ",\"accountCode\": \"" + accCode + "\"}"; 
         
             } else if(awbNo.length()) {
-                query = "{\"shipmentNo\" : {\"$in\" :" +
-                             lst + "}," + "\"activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}"+ "}";
+                query = "{\"shipment.awbno\" : {\"$in\" :" +
+                             lst + "}," + "\"shipment.shipmentInformation.activity.event\" :" + "{\"$ne\" : \"Proof of Delivery\"}"+ "}";
             }
 
-            std::string document = "{\"$push\": {\"activity\" : " + content + "}}";
+            std::string document = "{\"$push\": {\"shipment.shipmentInformation.activity\" : " + content + "}}";
 
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l Updating document:%s\n query:%s\n"), document.c_str(), query.c_str()));
             bool rsp = dbInst.update_collection(coll, query, document);
