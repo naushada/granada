@@ -668,7 +668,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
         if(found != std::string::npos) {
           ext = uri.substr((found + 1), (uri.length() - found));
           fileName = uri.substr(6, (uri.length() - 6));
-          std::string newFile = "../webgui/ui/" + fileName;
+          std::string newFile = "../webgui/webui/" + fileName;
           ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s The extension is %s\n"), newFile.c_str(), ext.c_str()));
           /* Open the index.html file and send it to web browser. */
           std::ifstream ifs(newFile.c_str());
@@ -692,7 +692,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
         std::size_t found = uri.find_last_of(".");
         if(found != std::string::npos) {
           ext = uri.substr((found + 1), (uri.length() - found));
-          std::string newFile = "../webgui/ui" + uri;
+          std::string newFile = "../webgui/webui" + uri;
           ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s The extension is %s\n"), newFile.c_str(), ext.c_str()));
           /* Open the index.html file and send it to web browser. */
           std::ifstream ifs(newFile.c_str(), ios::binary);
@@ -711,7 +711,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
         }
 
     } else if((!uri.compare(0, 7, "/webui/"))) {
-        std::string newFile = "../webgui/ui/index.html";
+        std::string newFile = "../webgui/webui/index.html";
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s \n"), newFile.c_str()));
         /* Open the index.html file and send it to web browser. */
         std::ifstream ifs(newFile.c_str(), ios::binary);
@@ -729,7 +729,7 @@ std::string MicroService::handle_GET(std::string& in, MongodbClient& dbInst)
         }
 
     } else if(!uri.compare(0, 1, "/")) {
-        std::string newFile = "../webgui/ui/index.html";
+        std::string newFile = "../webgui/webui/index.html";
         ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l newFile Name is %s \n"), newFile.c_str()));
         /* Open the index.html file and send it to web browser. */
         std::ifstream ifs(newFile.c_str(), ios::binary);
