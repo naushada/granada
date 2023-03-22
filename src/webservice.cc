@@ -994,12 +994,12 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
             lst +=  accCode.substr(start);
             lst += "]";
 
-            document = "{\"accountCode\" : {\"$in\" : " +
+            document = "{\"shipment.senderInformation.accountNo\" : {\"$in\" : " +
                         lst + 
                         "}," +
-                        "\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+                        "\"shipment.shipmentInformation.createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
                         "\"$lte\": \"" + toDate + "\"}," +
-                        "\"country\" :\"" + country + "\"}"; 
+                        "\"shipment.receiverInformation.country\" :\"" + country + "\"}"; 
         
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The query:%s\n"), document.c_str()));
 
@@ -1035,10 +1035,10 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
             lst +=  accCode.substr(start);
             lst += "]";
 
-            document = "{\"accountCode\" : {\"$in\" : " +
+            document = "{\"shipment.senderInformation.accountNo\" : {\"$in\" : " +
                         lst + 
                         "}," +
-                        "\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+                        "\"shipment.shipmentInformation.createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
                         "\"$lte\": \"" + toDate + "\"}}"; 
         
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The query:%s\n"), document.c_str()));
@@ -1063,9 +1063,9 @@ std::string MicroService::handle_shipment_GET(std::string& in, MongodbClient& db
             
             std::string document("");
 
-            document = "{\"createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
+            document = "{\"shipment.shipmentInformation.createdOn\" : {\"$gte\": \""  + fromDate + "\"," + 
                         "\"$lte\": \"" + toDate + "\"}," +
-                        "\"country\" :\"" + country + "\"}"; 
+                        "\"shipment.receiverInformation.country\" :\"" + country + "\"}"; 
         
             ACE_DEBUG((LM_DEBUG, ACE_TEXT("%D [worker:%t] %M %N:%l The query:%s\n"), document.c_str()));
 
